@@ -117,16 +117,16 @@ class MainActivity : AppCompatActivity() {
         return when (zodiac) {
             "Овен"     -> R.drawable.oven
             "Телец"    -> R.drawable.telec
-            "Близнецы" -> R.drawable.blizneci
-            "Рак"      -> R.drawable.rak
-            "Лев"      -> R.drawable.lev
+            "Близнецы" -> R.drawable.twins
+            "Рак"      -> R.drawable.cancer
+            "Лев"      -> R.drawable.lie
             "Дева"     -> R.drawable.deva
-            "Весы"     -> R.drawable.vesi
-            "Скорпион" -> R.drawable.scorpion
-            "Стрелец"  -> R.drawable.strelec
-            "Козерог"  -> R.drawable.kozerog
-            "Водолей"  -> R.drawable.vodoley
-            "Рыбы"     -> R.drawable.ribi
+            "Весы"     -> R.drawable.weight
+            "Скорпион" -> R.drawable.scorp
+            "Стрелец"  -> R.drawable.shooter
+            "Козерог"  -> R.drawable.roga
+            "Водолей"  -> R.drawable.water
+            "Рыбы"     -> R.drawable.fish
             else       -> R.drawable.ic_launcher_foreground
         }
     }
