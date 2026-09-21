@@ -1,3 +1,38 @@
 <resources>
     <string name="app_name">Juki</string>
+    <string name="name">Имя</string>
+    <string name="otchestvo">Отчество</string>
+    <string name="surname">Фамилия</string>
+
+    <string name="text_greeting">Регистрация</string>
+    <string name="choose_gender">Выберите пол</string>
+
+    <string-array name="course_list">
+        <item>1 курс</item>
+        <item>2 курс</item>
+        <item>3 курс</item>
+        <item>4 курс</item>
+    </string-array>
+
+    <string name="text_date">Укажите дату рождения</string>
+    <string name="dif_bar">Выберите уровень сложности</string>
+    <string name="male_gender">Мужчина</string>
+    <string name="female_gender">Женщина</string>
+    <string name="show">Показать</string>
+
+    <string name="author_photo">Фото автора</string>
+    <string name="author_Gorbachev">Gorbachev ИП-311</string>
+    <string name="author_Korotkov">Korotkov ИП-311</string>
+
+    <string name="tab_registration">Регистрация</string>
+    <string name="tab_rules">Правила</string>
+    <string name="tab_authors">Авторы</string>
+    <string name="tab_settings">Настройки</string>
+
+    <string name="settings_title">Настройки игры</string>
+    <string name="settings_game_speed">Скорость игры: %d</string>
+    <string name="settings_max_tarakani">Макс. тараканов на экране: %d</string>
+    <string name="settings_bonus_interval">Интервал бонусов (сек): %d</string>
+    <string name="settings_round_duration">Длительность раунда (сек): %d</string>
+
 </resources>
