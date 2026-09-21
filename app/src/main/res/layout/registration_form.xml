@@ -21,14 +21,14 @@
                 android:id="@+id/male"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/male_gender" />
+                android:text="мужчина" />
 
             <RadioButton
                 android:id="@+id/female"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="24dp"
-                android:text="@string/female_gender" />
+                android:text="женщина" />
         </RadioGroup>
 
         <Spinner
@@ -36,7 +36,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:entries="@array/course_list"
+            android:entries="курс"
             android:textSize="17sp"
             android:textStyle="normal" />
 
@@ -45,7 +45,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="@string/dif_bar"
+            android:text="сложность"
             android:textSize="18sp" />
 
         <SeekBar
@@ -61,14 +61,14 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="@string/text_date"
+            android:text="Выберите дату"
             android:textSize="18sp" />
 
         <Button
             android:id="@+id/btnPickDate"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Select Date" />
+            android:text="Выбрать дату" />
 
         <TextView
             android:id="@+id/tvSelectDate"
@@ -76,14 +76,14 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:textSize="18sp"
-            android:text="No date selected" />
+            android:text="Дата невыбрана" />
 
         <Button
             android:id="@+id/showZnak"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="@string/show" />
+            android:text="Показать" />
 
         <TextView
             android:id="@+id/tvResult"
