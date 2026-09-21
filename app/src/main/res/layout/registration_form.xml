@@ -11,6 +11,59 @@
         android:padding="16dp"
         tools:ignore="ExtraText">
 
+        <TextView
+            android:id="@+id/text_registration"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="36dp"
+            android:text="@string/text_greeting"
+            android:textSize="24sp"
+            android:textStyle="bold" />
+
+
+        <EditText
+            android:id="@+id/name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:autofillHints=""
+            android:hint="@string/name"
+            android:inputType="text"
+            android:textSize="17sp"
+            android:textStyle="normal" />
+
+        <EditText
+            android:id="@+id/surname"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:autofillHints=""
+            android:hint="@string/surname"
+            android:inputType="text"
+            android:textSize="17sp"
+            android:textStyle="normal" />
+
+        <EditText
+            android:id="@+id/othcestvo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:autofillHints=""
+            android:hint="@string/otchestvo"
+            android:inputType="text"
+            android:textSize="17sp"
+            android:textStyle="normal" />
+
+        <TextView
+            android:id="@+id/text_greeting"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="10dp"
+            android:text="@string/choose_gender"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
         <RadioGroup
             android:id="@+id/myRadioGroup"
             android:layout_width="match_parent"
@@ -21,14 +74,14 @@
                 android:id="@+id/male"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="мужчина" />
+                android:text="@string/male_gender" />
 
             <RadioButton
                 android:id="@+id/female"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="24dp"
-                android:text="женщина" />
+                android:text="@string/female_gender" />
         </RadioGroup>
 
         <Spinner
@@ -36,7 +89,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:entries="курс"
+            android:entries="@array/course_list"
             android:textSize="17sp"
             android:textStyle="normal" />
 
@@ -45,7 +98,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="сложность"
+            android:text="@string/dif_bar"
             android:textSize="18sp" />
 
         <SeekBar
@@ -61,14 +114,14 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="Выберите дату"
+            android:text="@string/text_date"
             android:textSize="18sp" />
 
         <Button
             android:id="@+id/btnPickDate"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Выбрать дату" />
+            android:text="Select Date" />
 
         <TextView
             android:id="@+id/tvSelectDate"
@@ -76,14 +129,14 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:textSize="18sp"
-            android:text="Дата невыбрана" />
+            android:text="No date selected" />
 
         <Button
             android:id="@+id/showZnak"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="Показать" />
+            android:text="@string/show" />
 
         <TextView
             android:id="@+id/tvResult"
