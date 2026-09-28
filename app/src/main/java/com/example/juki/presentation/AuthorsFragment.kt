@@ -23,8 +23,8 @@ class AuthorsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         val authors = listOf(
-                Author(getString(R.string.author_korotkov), R.drawable.korotkov),
-                Author(getString(R.string.author_gorbachev), R.drawable.gorbachev)
+                Author(getString(R.string.author_korotkov), R.drawable.ic_launcher_background),
+                Author(getString(R.string.author_gorbachev), R.drawable.ic_launcher_background)
         )
 
         val listView = view.findViewById<ListView>(R.id.lvAuthors)

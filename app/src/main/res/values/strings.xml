@@ -28,6 +28,8 @@
     <string name="tab_rules">Правила</string>
     <string name="tab_authors">Авторы</string>
     <string name="tab_settings">Настройки</string>
+    <string name="author_gorbachev">Kirill Gorbachev IP311</string>
+    <string name="author_korotkov">Kirill Korotkov IP311</string>
 
     <string name="settings_title">Настройки игры</string>
     <string name="settings_game_speed">Скорость игры: %d</string>
