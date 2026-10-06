@@ -20,9 +20,9 @@ import com.example.juki.presentation.PagerAdapter
 import java.util.Calendar
 
 class MainActivity : AppCompatActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        var gameSettings = GameSettings()
+    var gameSettings = GameSettings()
 
+    override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
