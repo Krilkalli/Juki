@@ -37,4 +37,15 @@
     <string name="settings_bonus_interval">Интервал бонусов (сек): %d</string>
     <string name="settings_round_duration">Длительность раунда (сек): %d</string>
 
+    <string name="lab4_start">Начать игру</string>
+    <string name="lab4_pause">Пауза</string>
+    <string name="lab4_resume">Продолжить</string>
+    <string name="lab4_menu">Вернуться в меню</string>
+    <string name="lab4_retry">Играть ещё раз</string>
+    <string name="lab4_result_title">Раунд завершён</string>
+    <string name="lab4_field_description">Игровое поле с жуками</string>
+    <string name="lab4_stats">Очки: %1$d\nПопадания: %2$d · Промахи: %3$d</string>
+    <string name="lab4_time">Осталось: %1$d сек.</string>
+    <string name="lab4_result">Очки: %1$d\nПопадания: %2$d\nПромахи: %3$d\nТочность: %4$.1f%%</string>
+
 </resources>
