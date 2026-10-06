@@ -1,23 +1,17 @@
 package com.example.juki
 
-import android.annotation.SuppressLint
-import android.app.DatePickerDialog
 import android.os.Bundle
+import android.view.View
 import android.widget.Button
-import android.widget.CalendarView
-import android.widget.EditText
-import androidx.viewpager2.widget.ViewPager2
-import com.google.android.material.tabs.TabLayout
-import com.google.android.material.tabs.TabLayoutMediator
-import android.widget.ImageView
-import android.widget.RadioGroup
-import android.widget.SeekBar
-import android.widget.Spinner
-import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.viewpager2.widget.ViewPager2
+import com.example.juki.game.GameActivity
 import com.example.juki.presentation.PagerAdapter
-import java.util.Calendar
+import com.google.android.material.tabs.TabLayout
+import com.google.android.material.tabs.TabLayoutMediator
 
 class MainActivity : AppCompatActivity() {
     var gameSettings = GameSettings()
@@ -26,6 +20,14 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
+
+        val root = findViewById<View>(android.R.id.content)
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
+        }
+        ViewCompat.requestApplyInsets(root)
 
         val tabLayout = findViewById<TabLayout>(R.id.tabLayout)
         val viewPager = findViewById<ViewPager2>(R.id.viewPager)
@@ -41,5 +43,9 @@ class MainActivity : AppCompatActivity() {
                 else -> ""
             }
         }.attach()
+
+        findViewById<Button>(R.id.btnStartGame).setOnClickListener {
+            GameActivity.start(this, gameSettings)
+        }
     }
 }
