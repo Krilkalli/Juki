@@ -47,5 +47,25 @@
     <string name="lab4_stats">Очки: %1$d\nПопадания: %2$d · Промахи: %3$d</string>
     <string name="lab4_time">Осталось: %1$d сек.</string>
     <string name="lab4_result">Очки: %1$d\nПопадания: %2$d\nПромахи: %3$d\nТочность: %4$.1f%%</string>
+    <string name="current_player_none">Текущий игрок не выбран</string>
+    <string name="current_player">Текущий игрок: %1$s</string>
+    <string name="select_player_first">Сначала выберите или зарегистрируйте игрока</string>
+    <string name="select_player_hint">Новый игрок</string>
 
+    <string name="select_player">Выберите ранее зарегистрированного игрока</string>
+    <string name="register_player">Зарегистрировать нового игрока</string>
+    <string name="fill_name_surname">Введите имя и фамилию</string>
+    <string name="player_registered">Игрок зарегистрирован и выбран</string>
+    <string name="player_register_error">Не удалось зарегистрировать игрока. Попробуйте ещё раз.</string>
+    <string name="players_load_error">Не удалось загрузить игроков</string>
+    <string name="tab_records">Рекорды</string>
+    <string name="records_title">Лучший результат каждого игрока</string>
+    <string name="records_loading">Загрузка результатов…</string>
+    <string name="records_empty">Пока нет завершённых игр</string>
+    <string name="records_load_error">Не удалось загрузить результаты</string>
+    <string name="record_entry">%1$s\nОчки: %2$d · Сложность: %3$d\n%4$s</string>
+    <string name="score_saving">Сохранение результата…</string>
+    <string name="score_saved">Результат сохранён</string>
+    <string name="score_save_error">Не удалось сохранить результат</string>
+    <string name="score_save_retry">Повторить сохранение</string>
 </resources>

@@ -9,6 +9,15 @@ import android.os.SystemClock
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
+import androidx.lifecycle.lifecycleScope
+import com.example.juki.MyApplication
+import com.example.juki.domain.model.User
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
+import java.util.UUID
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -25,6 +34,13 @@ class GameActivity : AppCompatActivity() {
     private lateinit var pauseButton: Button
     private lateinit var settings: GameSettings
     private var gameView: BugsGameView? = null
+
+    private val scoreRepository get() = (application as MyApplication).scoreRepository
+    private var userId = 0L
+    private var difficulty = 0
+    private var recordId = newRecordId()
+    private var savingScore = false
+    private var resultSaved = false
 
     private var score = 0
     private var hits = 0
@@ -55,6 +71,16 @@ class GameActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        userId = intent.getLongExtra("userId", 0)
+        difficulty = intent.getIntExtra("difficulty", 0)
+        if (userId <= 0) {
+            Toast.makeText(this, R.string.select_player_first, Toast.LENGTH_LONG).show()
+            finish()
+            return
+        }
+        recordId = savedInstanceState?.getLong("recordId") ?: recordId
+        resultSaved = savedInstanceState?.getBoolean("resultSaved") ?: false
 
         settings = GameSettings(
             gameSpeed = intent.getIntExtra("speed", 50).coerceIn(1, 100),
@@ -225,7 +251,19 @@ class GameActivity : AppCompatActivity() {
                 22f
             )
         )
+        val saveStatus = createText("", 16f)
+        root.addView(saveStatus)
+        val saveAgain = Button(this).apply {
+            setText(R.string.score_save_retry)
+            visibility = android.view.View.GONE
+            setOnClickListener { saveResult(saveStatus, this) }
+        }
+        root.addView(saveAgain)
+        saveResult(saveStatus, saveAgain)
         addButton(getString(R.string.lab4_retry)) {
+            recordId = newRecordId()
+            resultSaved = false
+            savingScore = false
             score = 0
             hits = 0
             misses = 0
@@ -236,6 +274,41 @@ class GameActivity : AppCompatActivity() {
             startLoop()
         }
         addButton(getString(R.string.lab4_menu)) { finish() }
+    }
+
+    private fun saveResult(status: TextView, retry: Button) {
+        if (resultSaved) {
+            status.setText(R.string.score_saved)
+            return
+        }
+        if (savingScore) return
+        savingScore = true
+        status.setText(R.string.score_saving)
+        retry.visibility = android.view.View.GONE
+        val savedRecordId = recordId
+        val finalScore = score
+        val application = application as MyApplication
+        val saving = application.applicationScope.async(Dispatchers.IO) {
+            scoreRepository.save(userId, finalScore, difficulty, savedRecordId)
+        }
+        lifecycleScope.launch {
+            try {
+                saving.await()
+                if (recordId == savedRecordId) {
+                    resultSaved = true
+                    status.setText(R.string.score_saved)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (recordId == savedRecordId) {
+                    status.setText(R.string.score_save_error)
+                    retry.visibility = android.view.View.VISIBLE
+                }
+            } finally {
+                if (recordId == savedRecordId) savingScore = false
+            }
+        }
     }
 
     private fun createText(value: String, size: Float): TextView {
@@ -292,6 +365,8 @@ class GameActivity : AppCompatActivity() {
             advanceClock()
             if (remainingMs == 0L) finishRound()
         }
+        outState.putLong("recordId", recordId)
+        outState.putBoolean("resultSaved", resultSaved)
         outState.putInt("score", score)
         outState.putInt("hits", hits)
         outState.putInt("misses", misses)
@@ -302,8 +377,14 @@ class GameActivity : AppCompatActivity() {
     }
 
     companion object {
-        fun start(context: Context, settings: GameSettings) {
+        // Отрицательные ключи раундов не пересекаются с автоинкрементом Room.
+        // При пересоздании экрана ключ восстанавливается, поэтому дубль игнорируется.
+        private fun newRecordId(): Long = UUID.randomUUID().mostSignificantBits or Long.MIN_VALUE
+
+        fun start(context: Context, settings: GameSettings, user: User) {
             val intent = Intent(context, GameActivity::class.java).apply {
+                putExtra("userId", user.id)
+                putExtra("difficulty", user.difficulty)
                 putExtra("speed", settings.gameSpeed)
                 putExtra("maxBugs", settings.maxTarakani)
                 putExtra("bonus", settings.bonusIntervalSec)

@@ -9,10 +9,10 @@ class ScoreRepositoryImpl(
     private val scoreDao: ScoreDao
 ) : ScoreRepository {
 
-    override suspend fun save(userId: Long, score: Int, difficulty: Int) {
+    override suspend fun save(userId: Long, score: Int, difficulty: Int, recordId: Long) {
         scoreDao.insert(
             ScoreEntity(
-                id = 0,
+                id = recordId,
                 userId = userId,
                 score = score,
                 difficulty = difficulty,
@@ -20,6 +20,8 @@ class ScoreRepositoryImpl(
             )
         )
     }
+
+    override fun observeRecords() = scoreDao.observeRecords()
 
     override suspend fun getRecords(): List<ScoreRecord> {
         return scoreDao.getRecords()
