@@ -1,5 +1,8 @@
 package com.example.juki.domain.repository
 
+import com.example.juki.domain.model.Player
+import com.example.juki.domain.model.User
+
 interface UserRepository {
 
     suspend fun getAll(): List<User>
