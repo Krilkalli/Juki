@@ -8,7 +8,7 @@ import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import androidx.appcompat.content.res.AppCompatResources
-import com.example.juki.GameSettings
+import com.example.juki.domain.model.GameSettings
 import com.example.juki.R
 import kotlin.math.abs
 import kotlin.math.atan2

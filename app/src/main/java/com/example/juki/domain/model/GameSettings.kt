@@ -1,4 +1,4 @@
-package com.example.juki
+package com.example.juki.domain.model
 
 data class GameSettings(
         val gameSpeed: Int = 50,

@@ -1,6 +1,7 @@
-package com.example.juki
+package com.example.juki.domain.model
 
-data class Player(
+data class User(
+    val id: Long,
     val name: String,
     val surname: String,
     val otchestvo: String,

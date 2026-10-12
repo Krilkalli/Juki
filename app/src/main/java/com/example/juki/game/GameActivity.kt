@@ -13,7 +13,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.example.juki.GameSettings
+import com.example.juki.domain.model.GameSettings
 import com.example.juki.R
 import kotlin.math.ceil
 

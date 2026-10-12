@@ -7,7 +7,7 @@ import android.view.ViewGroup
 import android.widget.ListView
 import androidx.fragment.app.Fragment
 import com.example.juki.R
-import com.example.juki.Author
+import com.example.juki.domain.model.Author
 
 class AuthorsFragment : Fragment() {
 

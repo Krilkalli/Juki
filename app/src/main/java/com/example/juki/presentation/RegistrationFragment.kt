@@ -14,7 +14,7 @@ import android.widget.Spinner
 import android.widget.TextView
 import androidx.fragment.app.Fragment
 import com.example.juki.R
-import com.example.juki.Player
+import com.example.juki.domain.model.Player
 
 class RegistrationFragment : Fragment() {
 

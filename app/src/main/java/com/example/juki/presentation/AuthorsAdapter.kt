@@ -8,7 +8,7 @@ import android.widget.ArrayAdapter
 import android.widget.ImageView
 import android.widget.TextView
 import com.example.juki.R
-import com.example.juki.Author
+import com.example.juki.domain.model.Author
 
 class AuthorsAdapter(
         context: Context,

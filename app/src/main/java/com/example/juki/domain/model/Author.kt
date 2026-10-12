@@ -1,4 +1,4 @@
-package com.example.juki
+package com.example.juki.domain.model
 
 data class Author(
     val name: String,
