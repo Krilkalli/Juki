@@ -34,7 +34,7 @@
     <string name="settings_title">Настройки игры</string>
     <string name="settings_game_speed">Скорость игры: %d</string>
     <string name="settings_max_tarakani">Макс. тараканов на экране: %d</string>
-    <string name="settings_bonus_interval">Интервал бонусов (сек): %d</string>
+    <string name="settings_bonus_interval">Интервал бонусов: %d сек. (фиксированный)</string>
     <string name="settings_round_duration">Длительность раунда (сек): %d</string>
 
     <string name="lab4_start">Начать игру</string>

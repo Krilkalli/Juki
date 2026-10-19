@@ -60,7 +60,8 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:max="30"
-            android:progress="10" />
+            android:progress="15"
+            android:enabled="false" />
 
         <TextView
             android:id="@+id/tvRoundDuration"

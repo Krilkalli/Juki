@@ -89,7 +89,6 @@ class GameActivity : AppCompatActivity() {
         settings = GameSettings(
             gameSpeed = intent.getIntExtra("speed", 50).coerceIn(1, 100),
             maxTarakani = intent.getIntExtra("maxBugs", 5).coerceIn(1, 20),
-            bonusIntervalSec = intent.getIntExtra("bonus", 10).coerceIn(1, 30),
             roundDurationSec = intent.getIntExtra("duration", 60).coerceIn(1, 120)
         )
         score = savedInstanceState?.getInt("score") ?: 0
@@ -417,7 +416,6 @@ class GameActivity : AppCompatActivity() {
                 putExtra("difficulty", user.difficulty)
                 putExtra("speed", settings.gameSpeed)
                 putExtra("maxBugs", settings.maxTarakani)
-                putExtra("bonus", settings.bonusIntervalSec)
                 putExtra("duration", settings.roundDurationSec)
             }
             context.startActivity(intent)

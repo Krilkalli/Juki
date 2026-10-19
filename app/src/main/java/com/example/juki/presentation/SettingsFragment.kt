@@ -9,6 +9,7 @@ import android.widget.TextView
 import androidx.fragment.app.Fragment
 import com.example.juki.MainActivity
 import com.example.juki.R
+import com.example.juki.domain.model.GameSettings
 
 class SettingsFragment : Fragment() {
 
@@ -44,13 +45,13 @@ class SettingsFragment : Fragment() {
                     activity.gameSettings.copy(maxTarakani = value)
         }
 
-        view.findViewById<SeekBar>(R.id.seekBonusInterval).bindTo(
-                view.findViewById(R.id.tvBonusInterval),
-                R.string.settings_bonus_interval,
-                settings.bonusIntervalSec
-        ) { value ->
-            activity.gameSettings =
-                    activity.gameSettings.copy(bonusIntervalSec = value)
+        view.findViewById<TextView>(R.id.tvBonusInterval).text = getString(
+            R.string.settings_bonus_interval,
+            GameSettings.BONUS_INTERVAL_SEC
+        )
+        view.findViewById<SeekBar>(R.id.seekBonusInterval).apply {
+            progress = GameSettings.BONUS_INTERVAL_SEC
+            isEnabled = false
         }
 
         view.findViewById<SeekBar>(R.id.seekRoundDuration).bindTo(

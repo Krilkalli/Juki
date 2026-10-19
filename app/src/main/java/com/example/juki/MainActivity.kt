@@ -52,7 +52,6 @@ class MainActivity : AppCompatActivity() {
         gameSettings = GameSettings(
             gameSpeed = savedInstanceState?.getInt("speed") ?: 50,
             maxTarakani = savedInstanceState?.getInt("maxBugs") ?: 5,
-            bonusIntervalSec = savedInstanceState?.getInt("bonus") ?: 10,
             roundDurationSec = savedInstanceState?.getInt("duration") ?: 60
         )
 
@@ -96,7 +95,6 @@ class MainActivity : AppCompatActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putInt("speed", gameSettings.gameSpeed)
         outState.putInt("maxBugs", gameSettings.maxTarakani)
-        outState.putInt("bonus", gameSettings.bonusIntervalSec)
         outState.putInt("duration", gameSettings.roundDurationSec)
         super.onSaveInstanceState(outState)
     }

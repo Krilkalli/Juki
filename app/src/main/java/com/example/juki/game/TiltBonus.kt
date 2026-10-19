@@ -1,5 +1,6 @@
 package com.example.juki.game
 
+import com.example.juki.domain.model.GameSettings
 import kotlin.math.hypot
 
 data class TiltBonus(
@@ -12,7 +13,7 @@ data class TiltBonus(
     }
 
     companion object {
-        const val SPAWN_INTERVAL_SEC = 15f
+        const val SPAWN_INTERVAL_SEC = GameSettings.BONUS_INTERVAL_SEC * 1f
         const val EFFECT_DURATION_SEC = 5f
     }
 }
