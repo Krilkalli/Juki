@@ -62,7 +62,7 @@ class GameActivity : AppCompatActivity() {
                 return
             }
 
-            gameView?.tick((elapsed / 1000f).coerceAtMost(0.05f))
+            gameView?.tick(elapsed / 1000f)
             updateLabels()
             handler.postDelayed(this, 20L)
         }

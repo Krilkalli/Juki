@@ -29,6 +29,20 @@ class BugsGameView @JvmOverloads constructor(
     private var maxBugs = 5
     private var speedFactor = 1f
     private var inputEnabled = false
+    private var bonus: TiltBonus? = null
+    private var bonusElapsedSec = 0f
+
+    var onBonusCollected: (() -> Unit)? = null
+
+    private val bonusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.rgb(0, 150, 136)
+    }
+
+    private val bonusSymbolPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        strokeWidth = 8f
+        strokeCap = Paint.Cap.ROUND
+    }
 
     private val fieldPaint = Paint().apply {
         color = Color.rgb(232, 245, 233)
@@ -59,6 +73,9 @@ class BugsGameView @JvmOverloads constructor(
 
     fun prepareField() {
         bugs.clear()
+        bonus = null
+        bonusElapsedSec = 0f
+
         repeat(minOf(3, maxBugs)) { spawnBug() }
         invalidate()
     }
@@ -69,6 +86,13 @@ class BugsGameView @JvmOverloads constructor(
 
     fun tick(deltaSeconds: Float) {
         if (!deltaSeconds.isFinite() || deltaSeconds <= 0f) return
+
+        bonusElapsedSec += deltaSeconds
+        if (bonusElapsedSec >= TiltBonus.SPAWN_INTERVAL_SEC) {
+            bonusElapsedSec %= TiltBonus.SPAWN_INTERVAL_SEC
+            spawnBonus()
+        }
+
         val step = deltaSeconds.coerceAtMost(0.05f)
 
         bugs.forEach { bug ->
@@ -140,6 +164,20 @@ class BugsGameView @JvmOverloads constructor(
             drawable.draw(canvas)
             canvas.restore()
         }
+
+        bonus?.let { item ->
+            canvas.drawCircle(item.x, item.y, item.radius, bonusPaint)
+
+            val arm = item.radius * 0.4f
+            canvas.drawLine(
+                item.x - arm, item.y, item.x + arm, item.y,
+                bonusSymbolPaint
+            )
+            canvas.drawLine(
+                item.x, item.y - arm, item.x, item.y + arm,
+                bonusSymbolPaint
+            )
+        }
         canvas.restore()
     }
 
@@ -157,14 +195,20 @@ class BugsGameView @JvmOverloads constructor(
                 val top = (height - side) / 2f
                 val touchX = (event.x - left) / scale
                 val touchY = (event.y - top) / scale
-                val index = bugs.indexOfLast { it.contains(touchX, touchY) }
+                val currentBonus = bonus
 
-                if (index >= 0) {
-                    val bug = bugs.removeAt(index)
-                    spawnBug()
-                    onHit?.invoke(bug.points)
+                if (currentBonus != null && currentBonus.contains(touchX, touchY)) {
+                    bonus = null
+                    onBonusCollected?.invoke()
                 } else {
-                    onMiss?.invoke()
+                    val index = bugs.indexOfLast { it.contains(touchX, touchY) }
+                    if (index >= 0) {
+                        val bug = bugs.removeAt(index)
+                        spawnBug()
+                        onHit?.invoke(bug.points)
+                    } else {
+                        onMiss?.invoke()
+                    }
                 }
                 invalidate()
             }
@@ -184,6 +228,17 @@ class BugsGameView @JvmOverloads constructor(
     override fun performClick(): Boolean {
         super.performClick()
         return true
+    }
+
+    private fun spawnBonus() {
+        val radius = 55f
+        val available = Bug.FIELD_SIZE - radius * 2
+
+        bonus = TiltBonus(
+            x = radius + Random.nextFloat() * available,
+            y = radius + Random.nextFloat() * available,
+            radius = radius
+        )
     }
 
     private fun spawnBug() {
