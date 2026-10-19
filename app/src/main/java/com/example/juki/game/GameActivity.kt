@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.view.Surface
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -34,6 +35,8 @@ class GameActivity : AppCompatActivity() {
     private lateinit var pauseButton: Button
     private lateinit var settings: GameSettings
     private var gameView: BugsGameView? = null
+    private var tiltController: TiltController? = null
+    private var sensorWarningShown = false
 
     private val scoreRepository get() = (application as MyApplication).scoreRepository
     private var userId = 0L
@@ -100,6 +103,11 @@ class GameActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
         }
         setContentView(root)
+        tiltController = TiltController(
+            this,
+            rotation = { root.display?.rotation ?: Surface.ROTATION_0 },
+            onTilt = { x, y -> gameView?.setTilt(x, y) }
+        )
 
         val padding = dp(12)
         ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
@@ -197,6 +205,7 @@ class GameActivity : AppCompatActivity() {
             }
             paused = true
             handler.removeCallbacks(ticker)
+            tiltController?.stop()
             gameView?.setInputEnabled(false)
             updateLabels()
         } else {
@@ -210,11 +219,17 @@ class GameActivity : AppCompatActivity() {
 
     private fun startLoop() {
         handler.removeCallbacks(ticker)
-        val active = foreground && !paused && !ended
+        val active = foreground && !paused && !ended && gameView != null
         gameView?.setInputEnabled(active)
         if (active) {
+            if (tiltController?.start() != true && !sensorWarningShown) {
+                sensorWarningShown = true
+                Toast.makeText(this, R.string.tilt_sensor_unavailable, Toast.LENGTH_LONG).show()
+            }
             lastFrame = SystemClock.uptimeMillis()
             handler.post(ticker)
+        } else {
+            tiltController?.stop()
         }
     }
 
@@ -232,6 +247,7 @@ class GameActivity : AppCompatActivity() {
     }
 
     private fun showResult() {
+        tiltController?.stop()
         gameView?.onHit = null
         gameView?.onMiss = null
         gameView = null
@@ -349,12 +365,14 @@ class GameActivity : AppCompatActivity() {
         }
         foreground = false
         handler.removeCallbacks(ticker)
+        tiltController?.stop()
         gameView?.setInputEnabled(false)
         super.onPause()
     }
 
     override fun onDestroy() {
         handler.removeCallbacks(ticker)
+        tiltController?.stop()
         gameView?.onHit = null
         gameView?.onMiss = null
         super.onDestroy()

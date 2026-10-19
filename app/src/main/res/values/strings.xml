@@ -68,4 +68,5 @@
     <string name="score_saved">Результат сохранён</string>
     <string name="score_save_error">Не удалось сохранить результат</string>
     <string name="score_save_retry">Повторить сохранение</string>
+    <string name="tilt_sensor_unavailable">Датчик наклона недоступен. Жуки будут двигаться обычным образом.</string>
 </resources>
