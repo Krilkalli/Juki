@@ -31,6 +31,9 @@ class BugsGameView @JvmOverloads constructor(
     private var inputEnabled = false
     private var bonus: TiltBonus? = null
     private var bonusElapsedSec = 0f
+    private var tiltRemainingSec = 0f
+    private var tiltX = 0f
+    private var tiltY = 0f
 
     var onBonusCollected: (() -> Unit)? = null
 
@@ -75,6 +78,8 @@ class BugsGameView @JvmOverloads constructor(
         bugs.clear()
         bonus = null
         bonusElapsedSec = 0f
+        tiltRemainingSec = 0f
+        setTilt(0f, 0f)
 
         repeat(minOf(3, maxBugs)) { spawnBug() }
         invalidate()
@@ -82,6 +87,14 @@ class BugsGameView @JvmOverloads constructor(
 
     fun setInputEnabled(enabled: Boolean) {
         inputEnabled = enabled
+        if (!enabled) setTilt(0f, 0f)
+    }
+
+    // Screen coordinates: positive X points right, positive Y points down.
+    // The sensor controller supplies tilt normalized to the range -1..1.
+    fun setTilt(x: Float, y: Float) {
+        tiltX = if (x.isFinite()) x.coerceIn(-1f, 1f) else 0f
+        tiltY = if (y.isFinite()) y.coerceIn(-1f, 1f) else 0f
     }
 
     fun tick(deltaSeconds: Float) {
@@ -94,6 +107,8 @@ class BugsGameView @JvmOverloads constructor(
         }
 
         val step = deltaSeconds.coerceAtMost(0.05f)
+        val tiltStep = minOf(step, tiltRemainingSec)
+        tiltRemainingSec = (tiltRemainingSec - deltaSeconds).coerceAtLeast(0f)
 
         bugs.forEach { bug ->
             if (Random.nextFloat() < step * 2.5f) {
@@ -105,8 +120,9 @@ class BugsGameView @JvmOverloads constructor(
             }
 
             // Positions and velocities use logical field units, not pixels.
-            bug.x += bug.vx * step
-            bug.y += bug.vy * step
+            // Tilt adds drift without permanently changing the bug's own speed.
+            bug.x += bug.vx * step + tiltX * TILT_DRIFT_SPEED * tiltStep
+            bug.y += bug.vy * step + tiltY * TILT_DRIFT_SPEED * tiltStep
 
             val lower = bug.radius
             val upper = Bug.FIELD_SIZE - bug.radius
@@ -149,6 +165,14 @@ class BugsGameView @JvmOverloads constructor(
         canvas.save()
         canvas.translate(left, top)
         canvas.scale(scale, scale)
+        val effectElapsedSec = TiltBonus.EFFECT_DURATION_SEC - tiltRemainingSec
+        val blinkOn = tiltRemainingSec > 0f &&
+            (effectElapsedSec / BONUS_BLINK_INTERVAL_SEC).toInt() % 2 == 0
+        fieldPaint.color = if (blinkOn) {
+            Color.rgb(129, 212, 250)
+        } else {
+            Color.rgb(232, 245, 233)
+        }
         canvas.drawRect(0f, 0f, Bug.FIELD_SIZE, Bug.FIELD_SIZE, fieldPaint)
 
         bugs.forEach { bug ->
@@ -199,6 +223,7 @@ class BugsGameView @JvmOverloads constructor(
 
                 if (currentBonus != null && currentBonus.contains(touchX, touchY)) {
                     bonus = null
+                    tiltRemainingSec = TiltBonus.EFFECT_DURATION_SEC
                     onBonusCollected?.invoke()
                 } else {
                     val index = bugs.indexOfLast { it.contains(touchX, touchY) }
@@ -266,5 +291,10 @@ class BugsGameView @JvmOverloads constructor(
             vy = sin(angle) * speed,
             drawableRes = resource
         )
+    }
+
+    companion object {
+        private const val TILT_DRIFT_SPEED = 600f
+        private const val BONUS_BLINK_INTERVAL_SEC = 0.5f
     }
 }
