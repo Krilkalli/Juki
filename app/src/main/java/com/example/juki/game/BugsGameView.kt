@@ -34,17 +34,15 @@ class BugsGameView @JvmOverloads constructor(
     private var tiltRemainingSec = 0f
     private var tiltX = 0f
     private var tiltY = 0f
+    private var fieldWidth = Bug.FIELD_SIZE
+    private var fieldHeight = Bug.FIELD_SIZE
 
     var onBonusCollected: (() -> Unit)? = null
 
-    private val bonusPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.rgb(0, 150, 136)
-    }
-
-    private val bonusSymbolPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
-        strokeWidth = 8f
-        strokeCap = Paint.Cap.ROUND
+    private val bonusDrawable by lazy {
+        requireNotNull(
+            AppCompatResources.getDrawable(context, R.drawable.ic_tilt_bonus)
+        ).mutate()
     }
 
     private val fieldPaint = Paint().apply {
@@ -125,21 +123,22 @@ class BugsGameView @JvmOverloads constructor(
             bug.y += bug.vy * step + tiltY * TILT_DRIFT_SPEED * tiltStep
 
             val lower = bug.radius
-            val upper = Bug.FIELD_SIZE - bug.radius
+            val right = fieldWidth - bug.radius
+            val bottom = fieldHeight - bug.radius
 
             if (bug.x < lower) {
                 bug.x = lower
                 bug.vx = abs(bug.vx)
-            } else if (bug.x > upper) {
-                bug.x = upper
+            } else if (bug.x > right) {
+                bug.x = right
                 bug.vx = -abs(bug.vx)
             }
 
             if (bug.y < lower) {
                 bug.y = lower
                 bug.vy = abs(bug.vy)
-            } else if (bug.y > upper) {
-                bug.y = upper
+            } else if (bug.y > bottom) {
+                bug.y = bottom
                 bug.vy = -abs(bug.vy)
             }
         }
@@ -150,6 +149,31 @@ class BugsGameView @JvmOverloads constructor(
         invalidate()
     }
 
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (w <= 0 || h <= 0) return
+
+        val scale = min(w, h) / Bug.FIELD_SIZE
+        val newWidth = w / scale
+        val newHeight = h / scale
+        bugs.forEach { bug ->
+            bug.x = (bug.x / fieldWidth * newWidth)
+                .coerceIn(bug.radius, newWidth - bug.radius)
+            bug.y = (bug.y / fieldHeight * newHeight)
+                .coerceIn(bug.radius, newHeight - bug.radius)
+        }
+        bonus = bonus?.let { item ->
+            item.copy(
+                x = (item.x / fieldWidth * newWidth)
+                    .coerceIn(item.radius, newWidth - item.radius),
+                y = (item.y / fieldHeight * newHeight)
+                    .coerceIn(item.radius, newHeight - item.radius)
+            )
+        }
+        fieldWidth = newWidth
+        fieldHeight = newHeight
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         canvas.drawColor(Color.rgb(245, 245, 245))
@@ -158,12 +182,10 @@ class BugsGameView @JvmOverloads constructor(
         if (side <= 0f) return
 
         val scale = side / Bug.FIELD_SIZE
-        val left = (width - side) / 2f
-        val top = (height - side) / 2f
 
-        // A uniform scale keeps the field and hit areas identical on all screens.
+        // Fill the view with a rectangular field while keeping sprites round.
+        // Drawing and taps use the same uniform scale.
         canvas.save()
-        canvas.translate(left, top)
         canvas.scale(scale, scale)
         val effectElapsedSec = TiltBonus.EFFECT_DURATION_SEC - tiltRemainingSec
         val blinkOn = tiltRemainingSec > 0f &&
@@ -173,7 +195,7 @@ class BugsGameView @JvmOverloads constructor(
         } else {
             Color.rgb(232, 245, 233)
         }
-        canvas.drawRect(0f, 0f, Bug.FIELD_SIZE, Bug.FIELD_SIZE, fieldPaint)
+        canvas.drawRect(0f, 0f, fieldWidth, fieldHeight, fieldPaint)
 
         bugs.forEach { bug ->
             val drawable = drawables.getValue(bug.drawableRes)
@@ -190,17 +212,13 @@ class BugsGameView @JvmOverloads constructor(
         }
 
         bonus?.let { item ->
-            canvas.drawCircle(item.x, item.y, item.radius, bonusPaint)
-
-            val arm = item.radius * 0.4f
-            canvas.drawLine(
-                item.x - arm, item.y, item.x + arm, item.y,
-                bonusSymbolPaint
+            bonusDrawable.setBounds(
+                (item.x - item.radius).toInt(),
+                (item.y - item.radius).toInt(),
+                (item.x + item.radius).toInt(),
+                (item.y + item.radius).toInt()
             )
-            canvas.drawLine(
-                item.x, item.y - arm, item.x, item.y + arm,
-                bonusSymbolPaint
-            )
+            bonusDrawable.draw(canvas)
         }
         canvas.restore()
     }
@@ -215,10 +233,8 @@ class BugsGameView @JvmOverloads constructor(
                 if (side <= 0f) return true
 
                 val scale = side / Bug.FIELD_SIZE
-                val left = (width - side) / 2f
-                val top = (height - side) / 2f
-                val touchX = (event.x - left) / scale
-                val touchY = (event.y - top) / scale
+                val touchX = event.x / scale
+                val touchY = event.y / scale
                 val currentBonus = bonus
 
                 if (currentBonus != null && currentBonus.contains(touchX, touchY)) {
@@ -257,11 +273,9 @@ class BugsGameView @JvmOverloads constructor(
 
     private fun spawnBonus() {
         val radius = 55f
-        val available = Bug.FIELD_SIZE - radius * 2
-
         bonus = TiltBonus(
-            x = radius + Random.nextFloat() * available,
-            y = radius + Random.nextFloat() * available,
+            x = radius + Random.nextFloat() * (fieldWidth - radius * 2),
+            y = radius + Random.nextFloat() * (fieldHeight - radius * 2),
             radius = radius
         )
     }
@@ -281,12 +295,10 @@ class BugsGameView @JvmOverloads constructor(
         }
         val angle = Random.nextFloat() * (Math.PI * 2).toFloat()
         val speed = type.baseSpeed * speedFactor
-        val available = Bug.FIELD_SIZE - type.radius * 2
-
         bugs += Bug(
             type = type,
-            x = type.radius + Random.nextFloat() * available,
-            y = type.radius + Random.nextFloat() * available,
+            x = type.radius + Random.nextFloat() * (fieldWidth - type.radius * 2),
+            y = type.radius + Random.nextFloat() * (fieldHeight - type.radius * 2),
             vx = cos(angle) * speed,
             vy = sin(angle) * speed,
             drawableRes = resource

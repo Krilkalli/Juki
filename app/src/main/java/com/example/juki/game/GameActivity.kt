@@ -2,6 +2,7 @@ package com.example.juki.game
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -9,6 +10,7 @@ import android.os.SystemClock
 import android.view.Surface
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.lifecycle.lifecycleScope
@@ -132,10 +134,10 @@ class GameActivity : AppCompatActivity() {
 
     private fun showGame() {
         root.removeAllViews()
+        val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        root.orientation = if (landscape) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
         statsText = createText("", 18f)
         timeText = createText("", 18f)
-        root.addView(statsText)
-        root.addView(timeText)
 
         val field = BugsGameView(this).apply {
             configure(settings)
@@ -159,14 +161,6 @@ class GameActivity : AppCompatActivity() {
             prepareField()
         }
         gameView = field
-        root.addView(
-            field,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-            )
-        )
 
         pauseButton = Button(this).apply {
             text = getString(
@@ -174,8 +168,39 @@ class GameActivity : AppCompatActivity() {
             )
             setOnClickListener { togglePause() }
         }
-        root.addView(pauseButton)
-        addButton(getString(R.string.lab4_menu)) { finish() }
+        if (landscape) {
+            root.addView(
+                field,
+                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+            )
+            val controls = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(12), 0, 0, 0)
+                addView(statsText)
+                addView(timeText)
+                addView(pauseButton)
+            }
+            statsText.textSize = 16f
+            timeText.textSize = 16f
+            addButton(getString(R.string.lab4_menu), controls) { finish() }
+            val sidebar = ScrollView(this).apply {
+                isFillViewport = true
+                addView(controls)
+            }
+            root.addView(
+                sidebar,
+                LinearLayout.LayoutParams(dp(176), LinearLayout.LayoutParams.MATCH_PARENT)
+            )
+        } else {
+            root.addView(statsText)
+            root.addView(timeText)
+            root.addView(
+                field,
+                LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
+            )
+            root.addView(pauseButton)
+            addButton(getString(R.string.lab4_menu)) { finish() }
+        }
         updateLabels()
     }
 
@@ -262,6 +287,7 @@ class GameActivity : AppCompatActivity() {
         gameView?.onBonusCollected = null
         gameView = null
         root.removeAllViews()
+        root.orientation = LinearLayout.VERTICAL
 
         val result = GameResult(score, hits, misses)
         root.addView(createText(getString(R.string.lab4_result_title), 26f))
@@ -345,8 +371,12 @@ class GameActivity : AppCompatActivity() {
         }
     }
 
-    private fun addButton(label: String, action: () -> Unit) {
-        root.addView(
+    private fun addButton(
+        label: String,
+        container: LinearLayout = root,
+        action: () -> Unit
+    ) {
+        container.addView(
             Button(this).apply {
                 text = label
                 setOnClickListener { action() }
