@@ -60,13 +60,12 @@ class GameActivity : AppCompatActivity() {
         override fun run() {
             if (!foreground || paused || ended) return
 
-            val elapsed = advanceClock()
+            advanceClock()
             if (remainingMs == 0L) {
                 finishRound()
                 return
             }
 
-            gameView?.tick(elapsed / 1000f)
             updateLabels()
             handler.postDelayed(this, 20L)
         }
@@ -192,12 +191,16 @@ class GameActivity : AppCompatActivity() {
         return true
     }
 
-    private fun advanceClock(): Long {
+    private fun advanceClock() {
         val now = SystemClock.uptimeMillis()
         val elapsed = (now - lastFrame).coerceAtLeast(0L)
         lastFrame = now
         remainingMs = (remainingMs - elapsed).coerceAtLeast(0L)
-        return elapsed
+        // Keep bonus timers in sync with the round, including the last
+        // interval before pausing, backgrounding or saving the activity.
+        if (remainingMs > 0L && !ended) {
+            gameView?.tick(elapsed / 1000f)
+        }
     }
 
     private fun togglePause() {
