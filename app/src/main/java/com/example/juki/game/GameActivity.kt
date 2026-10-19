@@ -36,6 +36,7 @@ class GameActivity : AppCompatActivity() {
     private lateinit var settings: GameSettings
     private var gameView: BugsGameView? = null
     private var tiltController: TiltController? = null
+    private var bugSoundPlayer: BugSoundPlayer? = null
     private var sensorWarningShown = false
 
     private val scoreRepository get() = (application as MyApplication).scoreRepository
@@ -103,6 +104,7 @@ class GameActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
         }
         setContentView(root)
+        bugSoundPlayer = BugSoundPlayer(this)
         tiltController = TiltController(
             this,
             rotation = { root.display?.rotation ?: Surface.ROTATION_0 },
@@ -152,6 +154,9 @@ class GameActivity : AppCompatActivity() {
                     misses++
                     updateLabels()
                 }
+            }
+            onBonusCollected = {
+                if (acceptHit()) bugSoundPlayer?.play()
             }
             prepareField()
         }
@@ -206,6 +211,7 @@ class GameActivity : AppCompatActivity() {
             paused = true
             handler.removeCallbacks(ticker)
             tiltController?.stop()
+            bugSoundPlayer?.stop()
             gameView?.setInputEnabled(false)
             updateLabels()
         } else {
@@ -248,8 +254,10 @@ class GameActivity : AppCompatActivity() {
 
     private fun showResult() {
         tiltController?.stop()
+        bugSoundPlayer?.stop()
         gameView?.onHit = null
         gameView?.onMiss = null
+        gameView?.onBonusCollected = null
         gameView = null
         root.removeAllViews()
 
@@ -366,6 +374,7 @@ class GameActivity : AppCompatActivity() {
         foreground = false
         handler.removeCallbacks(ticker)
         tiltController?.stop()
+        bugSoundPlayer?.stop()
         gameView?.setInputEnabled(false)
         super.onPause()
     }
@@ -373,8 +382,11 @@ class GameActivity : AppCompatActivity() {
     override fun onDestroy() {
         handler.removeCallbacks(ticker)
         tiltController?.stop()
+        bugSoundPlayer?.release()
+        bugSoundPlayer = null
         gameView?.onHit = null
         gameView?.onMiss = null
+        gameView?.onBonusCollected = null
         super.onDestroy()
     }
 
