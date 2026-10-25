@@ -48,5 +48,6 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.retrofit)
     implementation(libs.koin.android)
+    implementation(libs.androidx.work.runtime.ktx)
     testImplementation(libs.kxml2)
 }

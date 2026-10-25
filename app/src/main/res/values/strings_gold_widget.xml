@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_gold_name">Золото ЦБ</string>
+    <string name="widget_gold_description">Курс золота Банка России. Нажмите на шар, чтобы обновить.</string>
+    <string name="widget_gold_title">ЗОЛОТО ЦБ</string>
+    <string name="widget_gold_units">₽ за 1 г</string>
+    <string name="widget_gold_date">от %1$s</string>
+    <string name="widget_gold_no_price">—</string>
+    <string name="widget_gold_no_data">Курс не загружен</string>
+    <string name="widget_gold_loading">Обновляем…</string>
+    <string name="widget_gold_refresh">Нажми обновить</string>
+    <string name="widget_gold_error_empty">Нет данных\nНажми обновить</string>
+    <string name="widget_gold_error_cached">Сохранённый курс\nНажми обновить</string>
+    <string name="widget_gold_content_description">Золото ЦБ: %1$s рублей за грамм. %2$s. %3$s</string>
+</resources>
