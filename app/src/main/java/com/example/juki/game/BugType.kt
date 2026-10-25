@@ -21,5 +21,11 @@ enum class BugType(
             baseSpeed = 180f,
             radius = 35f,
             points = 50
+    ),
+
+    GOLD(
+            baseSpeed = 150f,
+            radius = 50f,
+            points = 0 // Фактическая награда рассчитывается по курсу золота.
     )
 }

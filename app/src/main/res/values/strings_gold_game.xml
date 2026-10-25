@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gold_bug_wait_for_rate">Курс золота ещё не загружен. Обновляем — нажмите на золотого жука ещё раз.</string>
+    <string name="gold_bug_rate_error">Не удалось загрузить курс золота. Обычные жуки доступны; для награды за золотого нужен курс ЦБ.</string>
+</resources>

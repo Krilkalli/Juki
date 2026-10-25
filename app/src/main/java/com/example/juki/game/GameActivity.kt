@@ -14,11 +14,15 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.example.juki.MyApplication
 import com.example.juki.domain.model.User
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.util.UUID
 import androidx.activity.enableEdgeToEdge
@@ -27,6 +31,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.example.juki.domain.model.GameSettings
 import com.example.juki.R
+import com.example.juki.widget.GoldWidgetRenderer
 import kotlin.math.ceil
 
 class GameActivity : AppCompatActivity() {
@@ -42,6 +47,8 @@ class GameActivity : AppCompatActivity() {
     private var sensorWarningShown = false
 
     private val scoreRepository get() = (application as MyApplication).scoreRepository
+    private val goldRateRepository get() = (application as MyApplication).goldRateRepository
+    private var goldRateJob: Job? = null
     private var userId = 0L
     private var difficulty = 0
     private var recordId = newRecordId()
@@ -130,6 +137,11 @@ class GameActivity : AppCompatActivity() {
         } else {
             showGame()
         }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                goldRateRepository.rate.collect { rate -> gameView?.setGoldRate(rate) }
+            }
+        }
     }
 
     private fun showGame() {
@@ -158,7 +170,14 @@ class GameActivity : AppCompatActivity() {
             onBonusCollected = {
                 if (acceptHit()) bugSoundPlayer?.play()
             }
+            onGoldUnavailable = {
+                if (acceptHit()) {
+                    Toast.makeText(this@GameActivity, R.string.gold_bug_wait_for_rate, Toast.LENGTH_SHORT).show()
+                    refreshGoldRate()
+                }
+            }
             prepareField()
+            setGoldRate(goldRateRepository.rate.value)
         }
         gameView = field
 
@@ -202,6 +221,23 @@ class GameActivity : AppCompatActivity() {
             addButton(getString(R.string.lab4_menu)) { finish() }
         }
         updateLabels()
+        refreshGoldRate()
+    }
+
+    private fun refreshGoldRate() {
+        if (goldRateJob?.isActive == true) return
+        goldRateJob = lifecycleScope.launch {
+            try {
+                goldRateRepository.refresh()
+                GoldWidgetRenderer.updateAll(this@GameActivity)
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                if (foreground && !ended && goldRateRepository.rate.value == null) {
+                    Toast.makeText(this@GameActivity, R.string.gold_bug_rate_error, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     private fun acceptHit(): Boolean {
@@ -285,6 +321,7 @@ class GameActivity : AppCompatActivity() {
         gameView?.onHit = null
         gameView?.onMiss = null
         gameView?.onBonusCollected = null
+        gameView?.onGoldUnavailable = null
         gameView = null
         root.removeAllViews()
         root.orientation = LinearLayout.VERTICAL
@@ -419,6 +456,7 @@ class GameActivity : AppCompatActivity() {
         gameView?.onHit = null
         gameView?.onMiss = null
         gameView?.onBonusCollected = null
+        gameView?.onGoldUnavailable = null
         super.onDestroy()
     }
 

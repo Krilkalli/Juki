@@ -9,6 +9,7 @@ import android.view.MotionEvent
 import android.view.View
 import androidx.appcompat.content.res.AppCompatResources
 import com.example.juki.domain.model.GameSettings
+import com.example.juki.domain.model.GoldRate
 import com.example.juki.R
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -31,6 +32,8 @@ class BugsGameView @JvmOverloads constructor(
     private var inputEnabled = false
     private var bonus: TiltBonus? = null
     private var bonusElapsedSec = 0f
+    private var goldElapsedSec = 0f
+    private var goldPoints: Int? = null
     private var tiltRemainingSec = 0f
     private var tiltX = 0f
     private var tiltY = 0f
@@ -38,6 +41,7 @@ class BugsGameView @JvmOverloads constructor(
     private var fieldHeight = Bug.FIELD_SIZE
 
     var onBonusCollected: (() -> Unit)? = null
+    var onGoldUnavailable: (() -> Unit)? = null
 
     private val bonusDrawable by lazy {
         requireNotNull(
@@ -49,8 +53,12 @@ class BugsGameView @JvmOverloads constructor(
         color = Color.rgb(232, 245, 233)
     }
 
+    private val goldGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(110, 255, 193, 7)
+    }
+
     private val drawables by lazy {
-        listOf(R.drawable.common, R.drawable.fast, R.drawable.rare)
+        listOf(R.drawable.common, R.drawable.fast, R.drawable.rare, R.drawable.ic_gold_bug)
             .associateWith { resource ->
                 requireNotNull(
                     AppCompatResources.getDrawable(context, resource)
@@ -76,6 +84,7 @@ class BugsGameView @JvmOverloads constructor(
         bugs.clear()
         bonus = null
         bonusElapsedSec = 0f
+        goldElapsedSec = 0f
         tiltRemainingSec = 0f
         setTilt(0f, 0f)
 
@@ -88,20 +97,36 @@ class BugsGameView @JvmOverloads constructor(
         if (!enabled) setTilt(0f, 0f)
     }
 
-    // Screen coordinates: positive X points right, positive Y points down.
-    // The sensor controller supplies tilt normalized to the range -1..1.
+
     fun setTilt(x: Float, y: Float) {
         tiltX = if (x.isFinite()) x.coerceIn(-1f, 1f) else 0f
         tiltY = if (y.isFinite()) y.coerceIn(-1f, 1f) else 0f
     }
 
+    fun setGoldRate(rate: GoldRate?) {
+        goldPoints = rate?.let(GoldBugRules::pointsFor)
+        bugs.indices.forEach { index ->
+            val bug = bugs[index]
+            if (bug.type == BugType.GOLD) {
+                bugs[index] = bug.copy(points = goldPoints ?: 0)
+            }
+        }
+        invalidate()
+    }
+
     fun tick(deltaSeconds: Float) {
         if (!deltaSeconds.isFinite() || deltaSeconds <= 0f) return
-
+//обновление состояния игры:
         bonusElapsedSec += deltaSeconds
         if (bonusElapsedSec >= TiltBonus.SPAWN_INTERVAL_SEC) {
             bonusElapsedSec %= TiltBonus.SPAWN_INTERVAL_SEC
             spawnBonus()
+        }
+
+        goldElapsedSec += deltaSeconds
+        if (goldElapsedSec >= GoldBugRules.SPAWN_INTERVAL_SEC) {
+            goldElapsedSec %= GoldBugRules.SPAWN_INTERVAL_SEC
+            spawnGoldBug()
         }
 
         val step = deltaSeconds.coerceAtMost(0.05f)
@@ -206,6 +231,9 @@ class BugsGameView @JvmOverloads constructor(
             canvas.save()
             canvas.translate(bug.x, bug.y)
             canvas.rotate(angle)
+            if (bug.type == BugType.GOLD) {
+                canvas.drawCircle(0f, 0f, bug.radius + 10f, goldGlowPaint)
+            }
             drawable.setBounds(-radius, -radius, radius, radius)
             drawable.draw(canvas)
             canvas.restore()
@@ -223,7 +251,7 @@ class BugsGameView @JvmOverloads constructor(
         canvas.restore()
     }
 
-    override fun onTouchEvent(event: MotionEvent): Boolean {
+    override fun onTouchEvent(event: MotionEvent): Boolean {//нажатие на бонус
         if (!inputEnabled) return true
 
         when (event.actionMasked) {
@@ -244,6 +272,10 @@ class BugsGameView @JvmOverloads constructor(
                 } else {
                     val index = bugs.indexOfLast { it.contains(touchX, touchY) }
                     if (index >= 0) {
+                        if (bugs[index].type == BugType.GOLD && goldPoints == null) {
+                            onGoldUnavailable?.invoke()
+                            return true
+                        }
                         val bug = bugs.removeAt(index)
                         spawnBug()
                         onHit?.invoke(bug.points)
@@ -288,20 +320,33 @@ class BugsGameView @JvmOverloads constructor(
             in 70..94 -> BugType.FAST
             else -> BugType.RARE
         }
+        bugs += createBug(type)
+    }
+
+    private fun spawnGoldBug() {
+        // На поле один золотой жук; общий лимит насекомых сохраняется.
+        bugs.removeAll { it.type == BugType.GOLD }
+        if (bugs.size >= maxBugs) bugs.removeAt(bugs.lastIndex)
+        bugs += createBug(BugType.GOLD, goldPoints ?: 0)
+    }
+
+    private fun createBug(type: BugType, points: Int = type.points): Bug {
         val resource = when (type) {
             BugType.NORMAL -> R.drawable.common
             BugType.FAST -> R.drawable.fast
             BugType.RARE -> R.drawable.rare
+            BugType.GOLD -> R.drawable.ic_gold_bug
         }
         val angle = Random.nextFloat() * (Math.PI * 2).toFloat()
         val speed = type.baseSpeed * speedFactor
-        bugs += Bug(
+        return Bug(
             type = type,
             x = type.radius + Random.nextFloat() * (fieldWidth - type.radius * 2),
             y = type.radius + Random.nextFloat() * (fieldHeight - type.radius * 2),
             vx = cos(angle) * speed,
             vy = sin(angle) * speed,
-            drawableRes = resource
+            drawableRes = resource,
+            points = points
         )
     }
 

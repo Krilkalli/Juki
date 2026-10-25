@@ -10,16 +10,14 @@ data class Bug(
         var vx: Float,
         var vy: Float,
         val drawableRes: Int,
-        val id: String = UUID.randomUUID().toString()
+        val id: String = UUID.randomUUID().toString(),
+        val points: Int = type.points
 ) {
     val radius: Float
         get() = type.radius
 
     val speed: Float
         get() = hypot(vx, vy)
-
-    val points: Int
-        get() = type.points
 
     fun contains(touchX: Float, touchY: Float): Boolean {
         return hypot(touchX - x, touchY - y) <= radius
