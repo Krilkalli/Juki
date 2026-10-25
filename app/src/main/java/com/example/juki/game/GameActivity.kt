@@ -32,6 +32,8 @@ import androidx.core.view.WindowInsetsCompat
 import com.example.juki.domain.model.GameSettings
 import com.example.juki.R
 import com.example.juki.widget.GoldWidgetRenderer
+import java.text.NumberFormat
+import java.util.Locale
 import kotlin.math.ceil
 
 class GameActivity : AppCompatActivity() {
@@ -39,6 +41,7 @@ class GameActivity : AppCompatActivity() {
     private lateinit var root: LinearLayout
     private lateinit var statsText: TextView
     private lateinit var timeText: TextView
+    private lateinit var goldRateText: TextView
     private lateinit var pauseButton: Button
     private lateinit var settings: GameSettings
     private var gameView: BugsGameView? = null
@@ -49,6 +52,8 @@ class GameActivity : AppCompatActivity() {
     private val scoreRepository get() = (application as MyApplication).scoreRepository
     private val goldRateRepository get() = (application as MyApplication).goldRateRepository
     private var goldRateJob: Job? = null
+    private var goldRateLoading = false
+    private var goldRateError = false
     private var userId = 0L
     private var difficulty = 0
     private var recordId = newRecordId()
@@ -139,7 +144,10 @@ class GameActivity : AppCompatActivity() {
         }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                goldRateRepository.rate.collect { rate -> gameView?.setGoldRate(rate) }
+                goldRateRepository.rate.collect { rate ->
+                    gameView?.setGoldRate(rate)
+                    updateGoldLabel()
+                }
             }
         }
     }
@@ -150,8 +158,16 @@ class GameActivity : AppCompatActivity() {
         root.orientation = if (landscape) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
         statsText = createText("", 18f)
         timeText = createText("", 18f)
+        goldRateText = createText("", 13f).apply {
+            id = R.id.goldRateText
+            setTextColor(android.graphics.Color.rgb(94, 61, 11))
+            setBackgroundResource(R.drawable.gold_rate_panel)
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+            setOnClickListener { refreshGoldRate() }
+        }
 
         val field = BugsGameView(this).apply {
+            id = R.id.gameField
             configure(settings)
             onHit = { points ->
                 if (acceptHit()) {
@@ -176,6 +192,15 @@ class GameActivity : AppCompatActivity() {
                     refreshGoldRate()
                 }
             }
+            onGoldHit = { points ->
+                if (this@GameActivity.foreground && !paused && !ended) {
+                    Toast.makeText(
+                        this@GameActivity,
+                        getString(R.string.gold_bug_hit_reward, points),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
             prepareField()
             setGoldRate(goldRateRepository.rate.value)
         }
@@ -197,6 +222,7 @@ class GameActivity : AppCompatActivity() {
                 setPadding(dp(12), 0, 0, 0)
                 addView(statsText)
                 addView(timeText)
+                addView(goldRateText)
                 addView(pauseButton)
             }
             statsText.textSize = 16f
@@ -213,6 +239,7 @@ class GameActivity : AppCompatActivity() {
         } else {
             root.addView(statsText)
             root.addView(timeText)
+            root.addView(goldRateText)
             root.addView(
                 field,
                 LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
@@ -221,11 +248,15 @@ class GameActivity : AppCompatActivity() {
             addButton(getString(R.string.lab4_menu)) { finish() }
         }
         updateLabels()
+        updateGoldLabel()
         refreshGoldRate()
     }
 
     private fun refreshGoldRate() {
         if (goldRateJob?.isActive == true) return
+        goldRateLoading = true
+        goldRateError = false
+        updateGoldLabel()
         goldRateJob = lifecycleScope.launch {
             try {
                 goldRateRepository.refresh()
@@ -233,11 +264,36 @@ class GameActivity : AppCompatActivity() {
             } catch (exception: CancellationException) {
                 throw exception
             } catch (exception: Exception) {
+                goldRateError = true
                 if (foreground && !ended && goldRateRepository.rate.value == null) {
                     Toast.makeText(this@GameActivity, R.string.gold_bug_rate_error, Toast.LENGTH_LONG).show()
                 }
+            } finally {
+                goldRateLoading = false
+                updateGoldLabel()
             }
         }
+    }
+
+    private fun updateGoldLabel() {
+        if (gameView == null || !::goldRateText.isInitialized) return
+        val rate = goldRateRepository.rate.value
+        val label = if (rate == null) {
+            getString(
+                if (goldRateLoading) R.string.gold_game_rate_loading
+                else R.string.gold_game_rate_missing
+            )
+        } else {
+            val price = NumberFormat.getNumberInstance(Locale.forLanguageTag("ru-RU")).apply {
+                minimumFractionDigits = 2
+                maximumFractionDigits = 2
+            }.format(rate.rublesPerGram)
+            val current = getString(R.string.gold_game_rate, price, rate.date, GoldBugRules.pointsFor(rate))
+            if (goldRateError) getString(R.string.gold_game_rate_cached, current) else current
+        }
+        goldRateText.text = label
+        goldRateText.alpha = if (goldRateLoading && rate != null) 0.65f else 1f
+        goldRateText.contentDescription = getString(R.string.gold_game_refresh_description, label)
     }
 
     private fun acceptHit(): Boolean {
@@ -322,6 +378,7 @@ class GameActivity : AppCompatActivity() {
         gameView?.onMiss = null
         gameView?.onBonusCollected = null
         gameView?.onGoldUnavailable = null
+        gameView?.onGoldHit = null
         gameView = null
         root.removeAllViews()
         root.orientation = LinearLayout.VERTICAL
@@ -457,6 +514,7 @@ class GameActivity : AppCompatActivity() {
         gameView?.onMiss = null
         gameView?.onBonusCollected = null
         gameView?.onGoldUnavailable = null
+        gameView?.onGoldHit = null
         super.onDestroy()
     }
 

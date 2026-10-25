@@ -2,4 +2,10 @@
 <resources>
     <string name="gold_bug_wait_for_rate">Курс золота ещё не загружен. Обновляем — нажмите на золотого жука ещё раз.</string>
     <string name="gold_bug_rate_error">Не удалось загрузить курс золота. Обычные жуки доступны; для награды за золотого нужен курс ЦБ.</string>
+    <string name="gold_bug_hit_reward">Золотой таракан: +%1$d очков!</string>
+    <string name="gold_game_rate">Золото ЦБ: %1$s ₽/г · %2$s\nЗолотой жук: +%3$d очк. · каждые 20 сек.</string>
+    <string name="gold_game_rate_loading">Золото ЦБ: загружаем курс…\nЗолотой жук появляется каждые 20 сек.</string>
+    <string name="gold_game_rate_missing">Курс золота недоступен · нажми обновить\nНаграда за золотого — после загрузки курса.</string>
+    <string name="gold_game_rate_cached">%1$s\nСохранённый курс · нажми обновить</string>
+    <string name="gold_game_refresh_description">%1$s. Нажмите, чтобы обновить курс золота.</string>
 </resources>

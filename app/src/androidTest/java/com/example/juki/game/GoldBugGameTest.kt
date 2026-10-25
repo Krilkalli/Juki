@@ -46,7 +46,9 @@ class GoldBugGameTest {
             val field = createField()
             var awarded = 0
             var hits = 0
+            var goldAward = 0
             field.onHit = { awarded += it; hits++ }
+            field.onGoldHit = { goldAward = it }
             field.tick(20.25f)
             clearBonus(field)
             field.setGoldRate(rate("20000"))
@@ -54,6 +56,7 @@ class GoldBugGameTest {
             assertEquals(200, golden.points)
             tap(field, golden.x, golden.y)
             assertEquals(200, awarded)
+            assertEquals(200, goldAward)
             assertEquals(1, hits)
             assertFalse(bugs(field).any { it.type == BugType.GOLD })
 

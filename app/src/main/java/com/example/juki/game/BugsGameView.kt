@@ -42,6 +42,7 @@ class BugsGameView @JvmOverloads constructor(
 
     var onBonusCollected: (() -> Unit)? = null
     var onGoldUnavailable: (() -> Unit)? = null
+    var onGoldHit: ((Int) -> Unit)? = null
 
     private val bonusDrawable by lazy {
         requireNotNull(
@@ -279,6 +280,7 @@ class BugsGameView @JvmOverloads constructor(
                         val bug = bugs.removeAt(index)
                         spawnBug()
                         onHit?.invoke(bug.points)
+                        if (bug.type == BugType.GOLD) onGoldHit?.invoke(bug.points)
                     } else {
                         onMiss?.invoke()
                     }
