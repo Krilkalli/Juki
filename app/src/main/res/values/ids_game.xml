@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="gameStatsText" type="id" />
+    <item name="gameTimeText" type="id" />
+    <item name="gamePauseButton" type="id" />
+    <item name="gameResultText" type="id" />
+    <item name="gameSaveStatus" type="id" />
+    <item name="gameRetrySave" type="id" />
+    <item name="gameRetry" type="id" />
+</resources>

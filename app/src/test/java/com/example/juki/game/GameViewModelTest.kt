@@ -18,8 +18,11 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -232,6 +235,22 @@ class GameViewModelTest {
         assertFalse(vm.state.value.goldRateLoading)
         assertEquals(200, vm.state.value.game.goldRewardPoints)
         assertEquals("25.10.2026", vm.state.value.goldRate!!.date)
+    }
+
+    @Test
+    fun goldPriceAndRewardArePublishedTogether() {
+        val vm = createViewModel()
+        val observed = mutableListOf<GameUiState>()
+        val collector = applicationScope.launch(UnconfinedTestDispatcher(scheduler)) {
+            vm.state.collect { observed += it }
+        }
+        gold.mutableRate.value = GoldRate("25.10.2026", BigDecimal("20000"))
+        scheduler.runCurrent()
+        assertEquals(200, vm.state.value.game.goldRewardPoints)
+        assertTrue(observed.all { state ->
+            state.game.goldRewardPoints == state.goldRate?.let(GoldBugRules::pointsFor)
+        })
+        collector.cancel()
     }
 
     @Test

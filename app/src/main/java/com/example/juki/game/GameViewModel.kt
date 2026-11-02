@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.juki.domain.model.GameSettings
+import com.example.juki.domain.model.GoldRate
 import com.example.juki.domain.repository.GoldRateRepository
 import com.example.juki.domain.repository.ScoreRepository
 import kotlinx.coroutines.CancellationException
@@ -65,8 +66,7 @@ class GameViewModel(
         viewModelScope.launch {
             goldRepository.rate.collect { rate ->
                 engine.setGoldRate(rate)
-                mutableState.update { it.copy(goldRate = rate) }
-                publish()
+                publish(rate)
             }
         }
         if (state.value.game.ended) saveResult() else refreshGoldRate()
@@ -205,12 +205,12 @@ class GameViewModel(
         if (state.value.game.ended) saveResult()
     }
 
-    private fun publish() {
+    private fun publish(rate: GoldRate? = mutableState.value.goldRate) {
         val game = engine.snapshot()
         savedState[GAME_STATE] = game
         savedState[RECORD_ID] = recordId
         savedState[RESULT_SAVED] = saveStatus == ScoreSaveStatus.SAVED
-        mutableState.update { it.copy(game = game, saveStatus = saveStatus) }
+        mutableState.update { it.copy(game = game, goldRate = rate, saveStatus = saveStatus) }
     }
 
     companion object {

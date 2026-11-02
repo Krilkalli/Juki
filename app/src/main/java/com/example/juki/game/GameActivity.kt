@@ -4,219 +4,151 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.os.SystemClock
 import android.view.Surface
+import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.repeatOnLifecycle
-import com.example.juki.MyApplication
-import com.example.juki.domain.model.User
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.launch
-import java.util.UUID
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.example.juki.domain.model.GameSettings
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.example.juki.R
+import com.example.juki.domain.model.GameSettings
+import com.example.juki.domain.model.User
 import com.example.juki.widget.GoldWidgetRenderer
+import kotlinx.coroutines.launch
+import org.koin.androidx.viewmodel.ext.android.viewModel
+import org.koin.core.parameter.parametersOf
 import java.text.NumberFormat
 import java.util.Locale
 import kotlin.math.ceil
 
 class GameActivity : AppCompatActivity() {
-
+    private val viewModel: GameViewModel by viewModel {
+        parametersOf(readSettings(), intent.getLongExtra("userId", 0L), intent.getIntExtra("difficulty", 0))
+    }
     private lateinit var root: LinearLayout
     private lateinit var statsText: TextView
     private lateinit var timeText: TextView
     private lateinit var goldRateText: TextView
     private lateinit var pauseButton: Button
-    private lateinit var settings: GameSettings
+    private var saveStatusText: TextView? = null
+    private var retrySaveButton: Button? = null
     private var gameView: BugsGameView? = null
     private var tiltController: TiltController? = null
     private var bugSoundPlayer: BugSoundPlayer? = null
-    private var sensorWarningShown = false
-
-    private val scoreRepository get() = (application as MyApplication).scoreRepository
-    private val goldRateRepository get() = (application as MyApplication).goldRateRepository
-    private var goldRateJob: Job? = null
-    private var goldRateLoading = false
-    private var goldRateError = false
-    private var userId = 0L
-    private var difficulty = 0
-    private var recordId = newRecordId()
-    private var savingScore = false
-    private var resultSaved = false
-
-    private var score = 0
-    private var hits = 0
-    private var misses = 0
-    private var remainingMs = 0L
-    private var paused = false
-    private var ended = false
+    private var showingResult: Boolean? = null
+    private var previousState: GameUiState? = null
     private var foreground = false
-    private var lastFrame = 0L
-
-    private val handler = Handler(Looper.getMainLooper())
-    private val ticker = object : Runnable {
-        override fun run() {
-            if (!foreground || paused || ended) return
-
-            advanceClock()
-            if (remainingMs == 0L) {
-                finishRound()
-                return
-            }
-
-            updateLabels()
-            handler.postDelayed(this, 20L)
-        }
-    }
+    private var controlsActive = false
+    private var sensorWarningShown = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
-        userId = intent.getLongExtra("userId", 0)
-        difficulty = intent.getIntExtra("difficulty", 0)
-        if (userId <= 0) {
+        if (intent.getLongExtra("userId", 0L) <= 0) {
             Toast.makeText(this, R.string.select_player_first, Toast.LENGTH_LONG).show()
             finish()
             return
         }
-        recordId = savedInstanceState?.getLong("recordId") ?: recordId
-        resultSaved = savedInstanceState?.getBoolean("resultSaved") ?: false
-
-        settings = GameSettings(
-            gameSpeed = intent.getIntExtra("speed", 50).coerceIn(1, 100),
-            maxTarakani = intent.getIntExtra("maxBugs", 5).coerceIn(1, 20),
-            roundDurationSec = intent.getIntExtra("duration", 60).coerceIn(1, 120)
-        )
-        score = savedInstanceState?.getInt("score") ?: 0
-        hits = savedInstanceState?.getInt("hits") ?: 0
-        misses = savedInstanceState?.getInt("misses") ?: 0
-        paused = savedInstanceState?.getBoolean("paused") ?: false
-        ended = savedInstanceState?.getBoolean("ended") ?: false
-        remainingMs = savedInstanceState?.getLong("remaining")
-            ?: settings.roundDurationSec * 1000L
-
-        root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
+        sensorWarningShown = savedInstanceState?.getBoolean("sensorWarningShown") ?: false
+        root = LinearLayout(this)
         setContentView(root)
+        val padding = dp(12)
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(padding + bars.left, padding + bars.top, padding + bars.right, padding + bars.bottom)
+            insets
+        }
+        ViewCompat.requestApplyInsets(root)
         bugSoundPlayer = BugSoundPlayer(this)
         tiltController = TiltController(
             this,
             rotation = { root.display?.rotation ?: Surface.ROTATION_0 },
-            onTilt = { x, y -> gameView?.setTilt(x, y) }
+            onTilt = viewModel::setTilt
         )
-
-        val padding = dp(12)
-        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.setPadding(
-                padding + bars.left,
-                padding + bars.top,
-                padding + bars.right,
-                padding + bars.bottom
-            )
-            insets
-        }
-        ViewCompat.requestApplyInsets(root)
-
-        if (ended || remainingMs == 0L) {
-            ended = true
-            showResult()
-        } else {
-            showGame()
-        }
+        render(viewModel.state.value)
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                goldRateRepository.rate.collect { rate ->
-                    gameView?.setGoldRate(rate)
-                    updateGoldLabel()
+                launch { viewModel.state.collect(::render) }
+                launch {
+                    viewModel.events.collect { event ->
+                        val game = viewModel.state.value.game
+                        if (foreground && !game.paused && !game.ended) handleEvent(event)
+                    }
                 }
             }
         }
     }
 
-    private fun showGame() {
+    private fun render(state: GameUiState) {
+        val old = previousState
+        previousState = state
+        val rebuild = showingResult != state.game.ended
+        if (rebuild) {
+            showingResult = state.game.ended
+            if (state.game.ended) showResult(state) else showGame(state)
+        }
+        if (state.game.ended) {
+            renderSaveStatus(state.saveStatus)
+        } else {
+            gameView?.render(state.game)
+            if (rebuild || old == null || old.game.score != state.game.score || old.game.hits != state.game.hits ||
+                old.game.misses != state.game.misses
+            ) {
+                statsText.text = getString(R.string.lab4_stats, state.game.score, state.game.hits, state.game.misses)
+            }
+            val seconds = ceil(state.game.remainingMs / 1000.0).toInt()
+            val oldSeconds = old?.game?.remainingMs?.let { ceil(it / 1000.0).toInt() }
+            if (rebuild || seconds != oldSeconds) timeText.text = getString(R.string.lab4_time, seconds)
+            if (rebuild || old == null || old.game.paused != state.game.paused) {
+                pauseButton.setText(if (state.game.paused) R.string.lab4_resume else R.string.lab4_pause)
+            }
+            if (rebuild || old == null || old.goldRate != state.goldRate || old.goldRateLoading != state.goldRateLoading ||
+                old.goldRateError != state.goldRateError || old.game.goldRewardPoints != state.game.goldRewardPoints
+            ) updateGoldLabel(state)
+        }
+        updateInteraction(state.game)
+        if (state.goldRate != null && !state.goldRateLoading && !state.goldRateError &&
+            (old == null || old.goldRate != state.goldRate || old.goldRateLoading || old.goldRateError)
+        ) GoldWidgetRenderer.updateAll(this)
+    }
+
+    private fun showGame(state: GameUiState) {
+        detachField()
         root.removeAllViews()
+        saveStatusText = null
+        retrySaveButton = null
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         root.orientation = if (landscape) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
-        statsText = createText("", 18f)
-        timeText = createText("", 18f)
+        statsText = createText("", if (landscape) 16f else 18f).apply { id = R.id.gameStatsText }
+        timeText = createText("", if (landscape) 16f else 18f).apply { id = R.id.gameTimeText }
         goldRateText = createText("", 13f).apply {
             id = R.id.goldRateText
             setTextColor(android.graphics.Color.rgb(94, 61, 11))
             setBackgroundResource(R.drawable.gold_rate_panel)
             setPadding(dp(8), dp(4), dp(8), dp(4))
-            setOnClickListener { refreshGoldRate() }
+            setOnClickListener { viewModel.refreshGoldRate() }
         }
-
         val field = BugsGameView(this).apply {
             id = R.id.gameField
-            configure(settings)
-            onHit = { points ->
-                if (acceptHit()) {
-                    score += points
-                    hits++
-                    updateLabels()
-                }
-            }
-            onMiss = {
-                if (acceptHit()) {
-                    score -= GameResult.MISS_PENALTY
-                    misses++
-                    updateLabels()
-                }
-            }
-            onBonusCollected = {
-                if (acceptHit()) bugSoundPlayer?.play()
-            }
-            onGoldUnavailable = {
-                if (acceptHit()) {
-                    Toast.makeText(this@GameActivity, R.string.gold_bug_wait_for_rate, Toast.LENGTH_SHORT).show()
-                    refreshGoldRate()
-                }
-            }
-            onGoldHit = { points ->
-                if (this@GameActivity.foreground && !paused && !ended) {
-                    Toast.makeText(
-                        this@GameActivity,
-                        getString(R.string.gold_bug_hit_reward, points),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-            prepareField()
-            setGoldRate(goldRateRepository.rate.value)
+            onFieldTap = { x, y -> viewModel.tap(x, y) }
+            onFieldSizeChanged = viewModel::resizeField
+            render(state.game)
         }
         gameView = field
-
         pauseButton = Button(this).apply {
-            text = getString(
-                if (paused) R.string.lab4_resume else R.string.lab4_pause
-            )
-            setOnClickListener { togglePause() }
+            id = R.id.gamePauseButton
+            setOnClickListener { viewModel.togglePause() }
         }
         if (landscape) {
-            root.addView(
-                field,
-                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
-            )
+            root.addView(field, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
             val controls = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(12), 0, 0, 0)
@@ -225,329 +157,166 @@ class GameActivity : AppCompatActivity() {
                 addView(goldRateText)
                 addView(pauseButton)
             }
-            statsText.textSize = 16f
-            timeText.textSize = 16f
             addButton(getString(R.string.lab4_menu), controls) { finish() }
             val sidebar = ScrollView(this).apply {
                 isFillViewport = true
                 addView(controls)
             }
-            root.addView(
-                sidebar,
-                LinearLayout.LayoutParams(dp(176), LinearLayout.LayoutParams.MATCH_PARENT)
-            )
+            root.addView(sidebar, LinearLayout.LayoutParams(dp(176), LinearLayout.LayoutParams.MATCH_PARENT))
         } else {
             root.addView(statsText)
             root.addView(timeText)
             root.addView(goldRateText)
-            root.addView(
-                field,
-                LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f)
-            )
+            root.addView(field, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
             root.addView(pauseButton)
             addButton(getString(R.string.lab4_menu)) { finish() }
         }
-        updateLabels()
-        updateGoldLabel()
-        refreshGoldRate()
     }
 
-    private fun refreshGoldRate() {
-        if (goldRateJob?.isActive == true) return
-        goldRateLoading = true
-        goldRateError = false
-        updateGoldLabel()
-        goldRateJob = lifecycleScope.launch {
-            try {
-                goldRateRepository.refresh()
-                GoldWidgetRenderer.updateAll(this@GameActivity)
-            } catch (exception: CancellationException) {
-                throw exception
-            } catch (exception: Exception) {
-                goldRateError = true
-                if (foreground && !ended && goldRateRepository.rate.value == null) {
-                    Toast.makeText(this@GameActivity, R.string.gold_bug_rate_error, Toast.LENGTH_LONG).show()
-                }
-            } finally {
-                goldRateLoading = false
-                updateGoldLabel()
-            }
-        }
-    }
-
-    private fun updateGoldLabel() {
-        if (gameView == null || !::goldRateText.isInitialized) return
-        val rate = goldRateRepository.rate.value
+    private fun updateGoldLabel(state: GameUiState) {
+        val rate = state.goldRate
         val label = if (rate == null) {
-            getString(
-                if (goldRateLoading) R.string.gold_game_rate_loading
-                else R.string.gold_game_rate_missing
-            )
+            getString(if (state.goldRateLoading) R.string.gold_game_rate_loading else R.string.gold_game_rate_missing)
         } else {
             val price = NumberFormat.getNumberInstance(Locale.forLanguageTag("ru-RU")).apply {
                 minimumFractionDigits = 2
                 maximumFractionDigits = 2
             }.format(rate.rublesPerGram)
-            val current = getString(R.string.gold_game_rate, price, rate.date, GoldBugRules.pointsFor(rate))
-            if (goldRateError) getString(R.string.gold_game_rate_cached, current) else current
+            val current = getString(R.string.gold_game_rate, price, rate.date, state.game.goldRewardPoints ?: 0)
+            if (state.goldRateError) getString(R.string.gold_game_rate_cached, current) else current
         }
         goldRateText.text = label
-        goldRateText.alpha = if (goldRateLoading && rate != null) 0.65f else 1f
+        goldRateText.alpha = if (state.goldRateLoading && rate != null) 0.65f else 1f
         goldRateText.contentDescription = getString(R.string.gold_game_refresh_description, label)
     }
 
-    private fun acceptHit(): Boolean {
-        if (!foreground || paused || ended) return false
-        // Reject taps after the deadline even if the next frame is delayed.
-        val elapsed = (SystemClock.uptimeMillis() - lastFrame).coerceAtLeast(0L)
-        if (elapsed >= remainingMs) {
-            remainingMs = 0L
-            finishRound()
-            return false
-        }
-        return true
-    }
-
-    private fun advanceClock() {
-        val now = SystemClock.uptimeMillis()
-        val elapsed = (now - lastFrame).coerceAtLeast(0L)
-        lastFrame = now
-        remainingMs = (remainingMs - elapsed).coerceAtLeast(0L)
-        // Keep bonus timers in sync with the round, including the last
-        // interval before pausing, backgrounding or saving the activity.
-        if (remainingMs > 0L && !ended) {
-            gameView?.tick(elapsed / 1000f)
-        }
-    }
-
-    private fun togglePause() {
-        if (!paused) {
-            advanceClock()
-            if (remainingMs == 0L) {
-                finishRound()
-                return
-            }
-            paused = true
-            handler.removeCallbacks(ticker)
-            tiltController?.stop()
-            bugSoundPlayer?.stop()
-            gameView?.setInputEnabled(false)
-            updateLabels()
-        } else {
-            paused = false
-            startLoop()
-        }
-        pauseButton.text = getString(
-            if (paused) R.string.lab4_resume else R.string.lab4_pause
-        )
-    }
-
-    private fun startLoop() {
-        handler.removeCallbacks(ticker)
-        val active = foreground && !paused && !ended && gameView != null
+    private fun updateInteraction(game: GameState) {
+        val active = foreground && !game.paused && !game.ended && gameView != null
         gameView?.setInputEnabled(active)
+        if (controlsActive == active) return
+        controlsActive = active
         if (active) {
             if (tiltController?.start() != true && !sensorWarningShown) {
                 sensorWarningShown = true
                 Toast.makeText(this, R.string.tilt_sensor_unavailable, Toast.LENGTH_LONG).show()
             }
-            lastFrame = SystemClock.uptimeMillis()
-            handler.post(ticker)
         } else {
             tiltController?.stop()
+            bugSoundPlayer?.stop()
         }
     }
 
-    private fun updateLabels() {
-        statsText.text = getString(R.string.lab4_stats, score, hits, misses)
-        val seconds = ceil(remainingMs / 1000.0).toInt()
-        timeText.text = getString(R.string.lab4_time, seconds)
+    private fun handleEvent(event: GameEvent) {
+        when (event) {
+            GameEvent.BonusCollected -> bugSoundPlayer?.play()
+            GameEvent.GoldRateUnavailable -> Toast.makeText(this, R.string.gold_bug_wait_for_rate, Toast.LENGTH_SHORT).show()
+            is GameEvent.BugHit -> if (event.type == BugType.GOLD) {
+                Toast.makeText(this, getString(R.string.gold_bug_hit_reward, event.points), Toast.LENGTH_SHORT).show()
+            }
+            GameEvent.Ignored, GameEvent.Missed -> Unit
+        }
     }
 
-    private fun finishRound() {
-        ended = true
-        handler.removeCallbacks(ticker)
-        gameView?.setInputEnabled(false)
-        showResult()
-    }
-
-    private fun showResult() {
-        tiltController?.stop()
-        bugSoundPlayer?.stop()
-        gameView?.onHit = null
-        gameView?.onMiss = null
-        gameView?.onBonusCollected = null
-        gameView?.onGoldUnavailable = null
-        gameView?.onGoldHit = null
-        gameView = null
+    private fun showResult(state: GameUiState) {
+        detachField()
         root.removeAllViews()
         root.orientation = LinearLayout.VERTICAL
-
-        val result = GameResult(score, hits, misses)
+        val result = state.game.result
         root.addView(createText(getString(R.string.lab4_result_title), 26f))
-        root.addView(
-            createText(
-                getString(
-                    R.string.lab4_result,
-                    result.score,
-                    result.hits,
-                    result.misses,
-                    result.accuracy
-                ),
-                22f
-            )
-        )
-        val saveStatus = createText("", 16f)
-        root.addView(saveStatus)
-        val saveAgain = Button(this).apply {
+        root.addView(createText(
+            getString(R.string.lab4_result, result.score, result.hits, result.misses, result.accuracy), 22f
+        ).apply { id = R.id.gameResultText })
+        saveStatusText = createText("", 16f).apply { id = R.id.gameSaveStatus }
+        root.addView(saveStatusText)
+        retrySaveButton = Button(this).apply {
+            id = R.id.gameRetrySave
             setText(R.string.score_save_retry)
-            visibility = android.view.View.GONE
-            setOnClickListener { saveResult(saveStatus, this) }
+            setOnClickListener { viewModel.saveResult() }
         }
-        root.addView(saveAgain)
-        saveResult(saveStatus, saveAgain)
-        addButton(getString(R.string.lab4_retry)) {
-            recordId = newRecordId()
-            resultSaved = false
-            savingScore = false
-            score = 0
-            hits = 0
-            misses = 0
-            paused = false
-            ended = false
-            remainingMs = settings.roundDurationSec * 1000L
-            showGame()
-            startLoop()
-        }
+        root.addView(retrySaveButton)
+        addButton(getString(R.string.lab4_retry)) { viewModel.restart() }.id = R.id.gameRetry
         addButton(getString(R.string.lab4_menu)) { finish() }
     }
 
-    private fun saveResult(status: TextView, retry: Button) {
-        if (resultSaved) {
-            status.setText(R.string.score_saved)
-            return
-        }
-        if (savingScore) return
-        savingScore = true
-        status.setText(R.string.score_saving)
-        retry.visibility = android.view.View.GONE
-        val savedRecordId = recordId
-        val finalScore = score
-        val application = application as MyApplication
-        val saving = application.applicationScope.async(Dispatchers.IO) {
-            scoreRepository.save(userId, finalScore, difficulty, savedRecordId)
-        }
-        lifecycleScope.launch {
-            try {
-                saving.await()
-                if (recordId == savedRecordId) {
-                    resultSaved = true
-                    status.setText(R.string.score_saved)
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                if (recordId == savedRecordId) {
-                    status.setText(R.string.score_save_error)
-                    retry.visibility = android.view.View.VISIBLE
-                }
-            } finally {
-                if (recordId == savedRecordId) savingScore = false
-            }
-        }
+    private fun renderSaveStatus(status: ScoreSaveStatus) {
+        saveStatusText?.setText(when (status) {
+            ScoreSaveStatus.NOT_STARTED, ScoreSaveStatus.SAVING -> R.string.score_saving
+            ScoreSaveStatus.SAVED -> R.string.score_saved
+            ScoreSaveStatus.ERROR -> R.string.score_save_error
+        })
+        retrySaveButton?.visibility = if (status == ScoreSaveStatus.ERROR) View.VISIBLE else View.GONE
     }
 
-    private fun createText(value: String, size: Float): TextView {
-        return TextView(this).apply {
-            text = value
-            textSize = size
-            setPadding(0, dp(8), 0, dp(8))
+    private fun detachField() {
+        gameView?.apply {
+            setInputEnabled(false)
+            onFieldTap = null
+            onFieldSizeChanged = null
         }
+        gameView = null
     }
 
-    private fun addButton(
-        label: String,
-        container: LinearLayout = root,
-        action: () -> Unit
-    ) {
-        container.addView(
-            Button(this).apply {
-                text = label
-                setOnClickListener { action() }
-            },
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        )
+    private fun readSettings() = GameSettings(
+        gameSpeed = intent.getIntExtra("speed", 50).coerceIn(1, 100),
+        maxTarakani = intent.getIntExtra("maxBugs", 5).coerceIn(1, 20),
+        roundDurationSec = intent.getIntExtra("duration", 60).coerceIn(1, 120)
+    )
+
+    private fun createText(value: String, size: Float) = TextView(this).apply {
+        text = value
+        textSize = size
+        setPadding(0, dp(8), 0, dp(8))
     }
 
-    private fun dp(value: Int): Int {
-        return (value * resources.displayMetrics.density).toInt()
-    }
+    private fun addButton(label: String, container: LinearLayout = root, action: () -> Unit): Button =
+        Button(this).apply {
+            text = label
+            setOnClickListener { action() }
+            container.addView(this, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ))
+        }
+
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     override fun onResume() {
         super.onResume()
+        if (!::root.isInitialized) return
         foreground = true
-        startLoop()
+        viewModel.setActive(true)
+        render(viewModel.state.value)
     }
 
     override fun onPause() {
-        if (foreground && !paused && !ended) {
-            advanceClock()
-            if (remainingMs == 0L) finishRound()
+        if (::root.isInitialized) {
+            foreground = false
+            viewModel.setActive(false)
+            updateInteraction(viewModel.state.value.game)
         }
-        foreground = false
-        handler.removeCallbacks(ticker)
-        tiltController?.stop()
-        bugSoundPlayer?.stop()
-        gameView?.setInputEnabled(false)
         super.onPause()
     }
 
     override fun onDestroy() {
-        handler.removeCallbacks(ticker)
+        detachField()
         tiltController?.stop()
         bugSoundPlayer?.release()
-        bugSoundPlayer = null
-        gameView?.onHit = null
-        gameView?.onMiss = null
-        gameView?.onBonusCollected = null
-        gameView?.onGoldUnavailable = null
-        gameView?.onGoldHit = null
         super.onDestroy()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
-        if (foreground && !paused && !ended) {
-            advanceClock()
-            if (remainingMs == 0L) finishRound()
-        }
-        outState.putLong("recordId", recordId)
-        outState.putBoolean("resultSaved", resultSaved)
-        outState.putInt("score", score)
-        outState.putInt("hits", hits)
-        outState.putInt("misses", misses)
-        outState.putLong("remaining", remainingMs)
-        outState.putBoolean("paused", paused)
-        outState.putBoolean("ended", ended)
+        outState.putBoolean("sensorWarningShown", sensorWarningShown)
         super.onSaveInstanceState(outState)
     }
 
     companion object {
-        // Отрицательные ключи раундов не пересекаются с автоинкрементом Room.
-        // При пересоздании экрана ключ восстанавливается, поэтому дубль игнорируется.
-        private fun newRecordId(): Long = UUID.randomUUID().mostSignificantBits or Long.MIN_VALUE
-
         fun start(context: Context, settings: GameSettings, user: User) {
-            val intent = Intent(context, GameActivity::class.java).apply {
+            context.startActivity(Intent(context, GameActivity::class.java).apply {
                 putExtra("userId", user.id)
                 putExtra("difficulty", user.difficulty)
                 putExtra("speed", settings.gameSpeed)
                 putExtra("maxBugs", settings.maxTarakani)
                 putExtra("duration", settings.roundDurationSec)
-            }
-            context.startActivity(intent)
+            })
         }
     }
 }
