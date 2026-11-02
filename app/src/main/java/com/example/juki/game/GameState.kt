@@ -1,5 +1,7 @@
 package com.example.juki.game
 
+import java.io.Serializable
+
 data class GameState(
     val score: Int,
     val hits: Int,
@@ -15,7 +17,7 @@ data class GameState(
     val goldElapsedSec: Float,
     val tiltRemainingSec: Float,
     val goldRewardPoints: Int?
-) {
+) : Serializable {
     val result: GameResult
         get() = GameResult(score, hits, misses)
 }

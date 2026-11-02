@@ -46,8 +46,11 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.savedstate)
     implementation(libs.retrofit)
     implementation(libs.koin.android)
     implementation(libs.androidx.work.runtime.ktx)
     testImplementation(libs.kxml2)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

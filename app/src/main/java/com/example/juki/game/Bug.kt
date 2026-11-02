@@ -1,6 +1,7 @@
 package com.example.juki.game
 
 import java.util.UUID
+import java.io.Serializable
 import kotlin.math.hypot
 
 data class Bug(
@@ -12,7 +13,7 @@ data class Bug(
         val drawableRes: Int,
         val id: String = UUID.randomUUID().toString(),
         val points: Int = type.points
-) {
+) : Serializable {
     val radius: Float
         get() = type.radius
 

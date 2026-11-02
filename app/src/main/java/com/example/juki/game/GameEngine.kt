@@ -71,6 +71,25 @@ class GameEngine(
         repeat(minOf(3, maxBugs)) { spawnBug() }
     }
 
+    fun restore(state: GameState) {
+        score = state.score
+        hits = state.hits
+        misses = state.misses
+        remainingMs = state.remainingMs
+        paused = state.paused
+        ended = state.ended
+        fieldWidth = state.fieldWidth
+        fieldHeight = state.fieldHeight
+        bugs.clear()
+        bugs.addAll(state.bugs.map { it.copy() })
+        bonus = state.bonus
+        bonusElapsedSec = state.bonusElapsedSec
+        goldElapsedSec = state.goldElapsedSec
+        tiltRemainingSec = state.tiltRemainingSec
+        goldPoints = state.goldRewardPoints
+        setTilt(0f, 0f)
+    }
+
     fun advance(elapsedMs: Long) {
         if (paused || ended || elapsedMs <= 0L) return
         val playingMs = minOf(elapsedMs, remainingMs)
