@@ -221,21 +221,29 @@ class GameActivity : AppCompatActivity() {
         detachField()
         root.removeAllViews()
         root.orientation = LinearLayout.VERTICAL
+        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            addView(content)
+        }
+        root.addView(scroll, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT
+        ))
         val result = state.game.result
-        root.addView(createText(getString(R.string.lab4_result_title), 26f))
-        root.addView(createText(
+        content.addView(createText(getString(R.string.lab4_result_title), 26f))
+        content.addView(createText(
             getString(R.string.lab4_result, result.score, result.hits, result.misses, result.accuracy), 22f
         ).apply { id = R.id.gameResultText })
         saveStatusText = createText("", 16f).apply { id = R.id.gameSaveStatus }
-        root.addView(saveStatusText)
+        content.addView(saveStatusText)
         retrySaveButton = Button(this).apply {
             id = R.id.gameRetrySave
             setText(R.string.score_save_retry)
             setOnClickListener { viewModel.saveResult() }
         }
-        root.addView(retrySaveButton)
-        addButton(getString(R.string.lab4_retry)) { viewModel.restart() }.id = R.id.gameRetry
-        addButton(getString(R.string.lab4_menu)) { finish() }
+        content.addView(retrySaveButton)
+        addButton(getString(R.string.lab4_retry), content) { viewModel.restart() }.id = R.id.gameRetry
+        addButton(getString(R.string.lab4_menu), content) { finish() }
     }
 
     private fun renderSaveStatus(status: ScoreSaveStatus) {
