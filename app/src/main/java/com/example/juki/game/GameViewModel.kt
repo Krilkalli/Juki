@@ -4,9 +4,11 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.juki.domain.model.GameSettings
+import com.example.juki.domain.model.Campaign
 import com.example.juki.domain.model.GoldRate
 import com.example.juki.domain.repository.GoldRateRepository
 import com.example.juki.domain.repository.ScoreRepository
+import com.example.juki.domain.repository.CampaignRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -31,9 +33,12 @@ class GameViewModel(
     private val scoreRepository: ScoreRepository,
     private val applicationScope: CoroutineScope,
     private val clock: GameClock,
-    private val savedState: SavedStateHandle
+    private val savedState: SavedStateHandle,
+    private val campaignRepository: CampaignRepository
 ) : ViewModel() {
-    private val engine = GameEngine(settings).apply {
+    private val campaignNumber = savedState.get<Int>("campaignLevel") ?: 0
+    private val campaignLevel = Campaign.level(campaignNumber)
+    private val engine = GameEngine(campaignLevel?.settings ?: settings).apply {
         savedState.get<GameState>(GAME_STATE)?.let(::restore)
         setGoldRate(goldRepository.rate.value)
     }
@@ -44,7 +49,11 @@ class GameViewModel(
         ScoreSaveStatus.NOT_STARTED
     }
     private val mutableState = MutableStateFlow(
-        GameUiState(engine.snapshot(), goldRepository.rate.value, saveStatus = saveStatus)
+        GameUiState(
+            engine.snapshot(), goldRepository.rate.value, saveStatus = saveStatus,
+            campaignLevel = campaignLevel,
+            campaignAccess = if (campaignNumber == 0) CampaignAccess.ALLOWED else CampaignAccess.LOADING
+        )
     )
     val state = mutableState.asStateFlow()
 
@@ -59,6 +68,7 @@ class GameViewModel(
     private var lastFrame = 0L
     private var ticker: Job? = null
     private var goldRateJob: Job? = null
+    private var campaignJob: Job? = null
 
     init {
         require(userId > 0) { "Для игры нужен зарегистрированный игрок" }
@@ -69,7 +79,34 @@ class GameViewModel(
                 publish(rate)
             }
         }
-        if (state.value.game.ended) saveResult() else refreshGoldRate()
+        if (campaignNumber != 0) loadCampaign()
+        else if (state.value.game.ended) saveResult() else refreshGoldRate()
+    }
+
+    fun loadCampaign() {
+        if (campaignNumber == 0 || campaignJob?.isActive == true) return
+        if (campaignLevel == null) {
+            mutableState.update { it.copy(campaignAccess = CampaignAccess.LOCKED) }
+            return
+        }
+        mutableState.update { it.copy(campaignAccess = CampaignAccess.LOADING) }
+        campaignJob = viewModelScope.launch {
+            try {
+                val progress = campaignRepository.getProgress(userId)
+                val allowed = Campaign.isUnlocked(campaignNumber, progress)
+                mutableState.update {
+                    it.copy(campaignAccess = if (allowed) CampaignAccess.ALLOWED else CampaignAccess.LOCKED)
+                }
+                if (allowed) {
+                    if (state.value.game.ended) saveResult() else refreshGoldRate()
+                    startTicker()
+                }
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                mutableState.update { it.copy(campaignAccess = CampaignAccess.ERROR) }
+            }
+        }
     }
 
     fun setActive(value: Boolean) {
@@ -88,7 +125,7 @@ class GameViewModel(
     }
 
     fun togglePause() {
-        if (!active) return
+        if (!active || state.value.campaignAccess != CampaignAccess.ALLOWED) return
         advanceClock()
         if (state.value.game.ended) return
         engine.setPaused(!state.value.game.paused)
@@ -97,7 +134,7 @@ class GameViewModel(
     }
 
     fun tap(x: Float, y: Float): GameEvent {
-        if (!active) return GameEvent.Ignored
+        if (!active || state.value.campaignAccess != CampaignAccess.ALLOWED) return GameEvent.Ignored
         // Сначала учитываем время: запоздалое нажатие не должно давать очки.
         advanceClock()
         val event = engine.tap(x, y)
@@ -110,7 +147,8 @@ class GameViewModel(
     }
 
     fun setTilt(x: Float, y: Float) {
-        if (active && !state.value.game.paused && !state.value.game.ended) {
+        if (active && state.value.campaignAccess == CampaignAccess.ALLOWED &&
+            !state.value.game.paused && !state.value.game.ended) {
             engine.setTilt(x, y)
         } else {
             engine.setTilt(0f, 0f)
@@ -125,6 +163,7 @@ class GameViewModel(
     }
 
     fun restart() {
+        if (state.value.campaignAccess != CampaignAccess.ALLOWED) return
         ticker?.cancel()
         engine.restart()
         engine.setGoldRate(goldRepository.rate.value)
@@ -152,7 +191,8 @@ class GameViewModel(
     }
 
     fun saveResult() {
-        if (!state.value.game.ended || saveStatus == ScoreSaveStatus.SAVED ||
+        if (state.value.campaignAccess != CampaignAccess.ALLOWED ||
+            !state.value.game.ended || saveStatus == ScoreSaveStatus.SAVED ||
             saveStatus == ScoreSaveStatus.SAVING
         ) return
         saveStatus = ScoreSaveStatus.SAVING
@@ -162,6 +202,7 @@ class GameViewModel(
         // Эта задача продолжится даже после закрытия Activity и ViewModel.
         val saving = applicationScope.async {
             scoreRepository.save(userId, finalScore, difficulty, savedRecordId)
+            campaignLevel?.let { campaignRepository.saveResult(userId, it.number, finalScore) }
         }
         viewModelScope.launch {
             try {
@@ -184,7 +225,8 @@ class GameViewModel(
     private fun startTicker() {
         ticker?.cancel()
         ticker = null
-        if (!active || state.value.game.paused || state.value.game.ended) return
+        if (!active || state.value.campaignAccess != CampaignAccess.ALLOWED ||
+            state.value.game.paused || state.value.game.ended) return
         lastFrame = clock.nowMillis()
         ticker = viewModelScope.launch {
             while (isActive && active) {
@@ -196,7 +238,7 @@ class GameViewModel(
     }
 
     private fun advanceClock() {
-        if (!active) return
+        if (!active || state.value.campaignAccess != CampaignAccess.ALLOWED) return
         val now = clock.nowMillis()
         val elapsed = (now - lastFrame).coerceAtLeast(0L)
         lastFrame = now

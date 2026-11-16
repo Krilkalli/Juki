@@ -19,7 +19,8 @@ val gameModule = module {
             scoreRepository = get(),
             applicationScope = get(named(APPLICATION_SCOPE)),
             clock = get(),
-            savedState = get()
+            savedState = get(),
+            campaignRepository = get()
         )
     }
 }

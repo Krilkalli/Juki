@@ -5,10 +5,13 @@ import androidx.lifecycle.ViewModelStore
 import com.example.juki.di.APPLICATION_SCOPE
 import com.example.juki.di.gameModule
 import com.example.juki.domain.model.GameSettings
+import com.example.juki.domain.model.Campaign
+import com.example.juki.domain.model.CampaignProgress
 import com.example.juki.domain.model.GoldRate
 import com.example.juki.domain.model.ScoreRecord
 import com.example.juki.domain.repository.GoldRateRepository
 import com.example.juki.domain.repository.ScoreRepository
+import com.example.juki.domain.repository.CampaignRepository
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -46,6 +49,7 @@ class GameViewModelTest {
     private lateinit var applicationScope: CoroutineScope
     private lateinit var gold: FakeGoldRepository
     private lateinit var scores: FakeScoreRepository
+    private lateinit var campaign: FakeCampaignRepository
     private val stores = mutableMapOf<GameViewModel, ViewModelStore>()
 
     @Before
@@ -56,6 +60,7 @@ class GameViewModelTest {
         applicationScope = CoroutineScope(SupervisorJob() + dispatcher)
         gold = FakeGoldRepository()
         scores = FakeScoreRepository()
+        campaign = FakeCampaignRepository()
     }
 
     @After
@@ -259,6 +264,7 @@ class GameViewModelTest {
             modules(gameModule, module {
                 single<GoldRateRepository> { gold }
                 single<ScoreRepository> { scores }
+                single<CampaignRepository> { campaign }
                 single(named(APPLICATION_SCOPE)) { applicationScope }
                 single<GameClock> { GameClock { scheduler.currentTime } }
                 single { SavedStateHandle() }
@@ -277,13 +283,79 @@ class GameViewModelTest {
         }
     }
 
+    @Test
+    fun lockedCampaignCannotStartOrReceiveTaps() {
+        val vm = createViewModel(handle = SavedStateHandle(mapOf("campaignLevel" to 2)))
+        vm.setActive(true)
+        advance(2000)
+        assertEquals(CampaignAccess.LOCKED, vm.state.value.campaignAccess)
+        assertEquals(60_000L, vm.state.value.game.remainingMs)
+        assertEquals(GameEvent.Ignored, vm.tap(0f, 0f))
+        assertTrue(scores.calls.isEmpty())
+    }
+
+    @Test
+    fun campaignUsesLevelSettingsAndPreservesProgressOnRotation() {
+        val handle = SavedStateHandle(mapOf("campaignLevel" to 1))
+        val vm = createViewModel(duration = 1, handle = handle)
+        vm.setActive(true)
+        vm.tap(0f, 0f)
+        advance(1000)
+        vm.setActive(false)
+        val before = vm.state.value.game
+        clear(vm)
+        val restored = createViewModel(handle = copyHandle(handle))
+        assertEquals(before, restored.state.value.game)
+        assertEquals(59_000L, before.remainingMs)
+        assertEquals(1, restored.state.value.campaignLevel!!.number)
+        assertEquals(CampaignAccess.ALLOWED, restored.state.value.campaignAccess)
+    }
+
+    @Test
+    fun finishedCampaignSavesProgressAndRecreationDoesNotSaveTwice() {
+        val round = GameEngine(GameSettings()).snapshot().copy(score = 100, remainingMs = 0, ended = true)
+        val handle = SavedStateHandle(mapOf("campaignLevel" to 1, "game_state" to round))
+        val vm = createViewModel(handle = handle)
+        assertEquals(ScoreSaveStatus.SAVED, vm.state.value.saveStatus)
+        assertEquals(listOf(CampaignProgress(1, 100)), campaign.progress)
+        assertTrue(Campaign.isUnlocked(2, campaign.progress))
+        clear(vm)
+        createViewModel(handle = copyHandle(handle))
+        assertEquals(1, campaign.saveCount)
+        assertEquals(1, scores.saved.size)
+    }
+
+    @Test
+    fun failedCampaignSaveCanBeRetriedWithoutDuplicateScore() {
+        campaign.failNext = true
+        val round = GameEngine(GameSettings()).snapshot().copy(score = 100, remainingMs = 0, ended = true)
+        val vm = createViewModel(handle = SavedStateHandle(mapOf("campaignLevel" to 1, "game_state" to round)))
+        assertEquals(ScoreSaveStatus.ERROR, vm.state.value.saveStatus)
+        assertTrue(campaign.progress.isEmpty())
+        vm.saveResult()
+        scheduler.runCurrent()
+        assertEquals(ScoreSaveStatus.SAVED, vm.state.value.saveStatus)
+        assertEquals(listOf(CampaignProgress(1, 100)), campaign.progress)
+        assertEquals(1, scores.saved.size)
+    }
+
+    @Test
+    fun ordinaryGameDoesNotChangeCampaignProgress() {
+        val vm = createViewModel(duration = 1)
+        vm.setActive(true)
+        advance(1000)
+        assertEquals(ScoreSaveStatus.SAVED, vm.state.value.saveStatus)
+        assertTrue(campaign.progress.isEmpty())
+        assertEquals(0, campaign.saveCount)
+    }
+
     private fun createViewModel(
         duration: Int = 60,
         handle: SavedStateHandle = SavedStateHandle(),
         clock: GameClock = GameClock { scheduler.currentTime }
     ): GameViewModel = GameViewModel(
         GameSettings(maxTarakani = 1, roundDurationSec = duration),
-        7L, 2, gold, scores, applicationScope, clock, handle
+        7L, 2, gold, scores, applicationScope, clock, handle, campaign
     ).also {
         register(it)
         scheduler.runCurrent()
@@ -329,6 +401,23 @@ class GameViewModelTest {
     }
 
     private data class SaveCall(val userId: Long, val score: Int, val difficulty: Int, val recordId: Long)
+
+    private class FakeCampaignRepository : CampaignRepository {
+        val progress = mutableListOf<CampaignProgress>()
+        var saveCount = 0
+        var failNext = false
+        override suspend fun getProgress(userId: Long) = progress.toList()
+        override suspend fun saveResult(userId: Long, levelNumber: Int, score: Int) {
+            if (failNext) {
+                failNext = false
+                throw IOException("Ошибка сохранения прогресса")
+            }
+            saveCount++
+            val old = progress.find { it.levelNumber == levelNumber }
+            progress.removeAll { it.levelNumber == levelNumber }
+            progress += CampaignProgress(levelNumber, maxOf(old?.bestScore ?: score, score))
+        }
+    }
 
     private class FakeScoreRepository : ScoreRepository {
         val calls = mutableListOf<SaveCall>()
