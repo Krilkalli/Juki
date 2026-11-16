@@ -20,6 +20,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.example.juki.R
 import com.example.juki.domain.model.GameSettings
+import com.example.juki.domain.model.Campaign
 import com.example.juki.domain.model.User
 import com.example.juki.widget.GoldWidgetRenderer
 import kotlinx.coroutines.launch
@@ -90,6 +91,10 @@ class GameActivity : AppCompatActivity() {
     private fun render(state: GameUiState) {
         val old = previousState
         previousState = state
+        if (state.campaignAccess != CampaignAccess.ALLOWED) {
+            if (old?.campaignAccess != state.campaignAccess) showCampaignMessage(state.campaignAccess)
+            return
+        }
         val rebuild = showingResult != state.game.ended
         if (rebuild) {
             showingResult = state.game.ended
@@ -120,6 +125,22 @@ class GameActivity : AppCompatActivity() {
         ) GoldWidgetRenderer.updateAll(this)
     }
 
+    private fun showCampaignMessage(access: CampaignAccess) {
+        detachField()
+        root.removeAllViews()
+        root.orientation = LinearLayout.VERTICAL
+        showingResult = null
+        root.addView(createText(getString(when (access) {
+            CampaignAccess.LOADING -> R.string.campaign_loading
+            CampaignAccess.LOCKED -> R.string.campaign_locked
+            else -> R.string.campaign_error
+        }), 20f))
+        if (access == CampaignAccess.ERROR) {
+            addButton(getString(R.string.campaign_retry)) { viewModel.loadCampaign() }
+        }
+        addButton(getString(R.string.campaign_to_levels)) { finish() }
+    }
+
     private fun showGame(state: GameUiState) {
         detachField()
         root.removeAllViews()
@@ -147,11 +168,16 @@ class GameActivity : AppCompatActivity() {
             id = R.id.gamePauseButton
             setOnClickListener { viewModel.togglePause() }
         }
+        val goalText = state.campaignLevel?.let { level ->
+            createText(getString(R.string.campaign_goal, level.number, level.targetScore), 16f)
+                .apply { id = R.id.campaignGoal }
+        }
         if (landscape) {
             root.addView(field, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
             val controls = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(12), 0, 0, 0)
+                goalText?.let { addView(it) }
                 addView(statsText)
                 addView(timeText)
                 addView(goldRateText)
@@ -164,6 +190,7 @@ class GameActivity : AppCompatActivity() {
             }
             root.addView(sidebar, LinearLayout.LayoutParams(dp(176), LinearLayout.LayoutParams.MATCH_PARENT))
         } else {
+            goalText?.let { root.addView(it) }
             root.addView(statsText)
             root.addView(timeText)
             root.addView(goldRateText)
@@ -234,6 +261,19 @@ class GameActivity : AppCompatActivity() {
         content.addView(createText(
             getString(R.string.lab4_result, result.score, result.hits, result.misses, result.accuracy), 22f
         ).apply { id = R.id.gameResultText })
+        state.campaignLevel?.let { level ->
+            val passed = Campaign.isPassed(level, result.score)
+            val message = if (passed) getString(R.string.campaign_passed)
+                else getString(R.string.campaign_failed, level.targetScore)
+            content.addView(createText(message, 20f).apply { id = R.id.campaignResult })
+            if (passed) {
+                val next = Campaign.level(level.number + 1)
+                content.addView(createText(
+                    if (next == null) getString(R.string.campaign_final_passed)
+                    else getString(R.string.campaign_unlocked_next, next.number), 16f
+                ))
+            }
+        }
         saveStatusText = createText("", 16f).apply { id = R.id.gameSaveStatus }
         content.addView(saveStatusText)
         retrySaveButton = Button(this).apply {
@@ -243,7 +283,9 @@ class GameActivity : AppCompatActivity() {
         }
         content.addView(retrySaveButton)
         addButton(getString(R.string.lab4_retry), content) { viewModel.restart() }.id = R.id.gameRetry
-        addButton(getString(R.string.lab4_menu), content) { finish() }
+        addButton(getString(if (state.campaignLevel != null) R.string.campaign_to_levels else R.string.lab4_menu), content) {
+            finish()
+        }
     }
 
     private fun renderSaveStatus(status: ScoreSaveStatus) {
@@ -317,13 +359,14 @@ class GameActivity : AppCompatActivity() {
     }
 
     companion object {
-        fun start(context: Context, settings: GameSettings, user: User) {
+        fun start(context: Context, settings: GameSettings, user: User, campaignLevel: Int = 0) {
             context.startActivity(Intent(context, GameActivity::class.java).apply {
                 putExtra("userId", user.id)
                 putExtra("difficulty", user.difficulty)
                 putExtra("speed", settings.gameSpeed)
                 putExtra("maxBugs", settings.maxTarakani)
                 putExtra("duration", settings.roundDurationSec)
+                putExtra("campaignLevel", campaignLevel)
             })
         }
     }

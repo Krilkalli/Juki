@@ -8,6 +8,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import android.view.View
 import android.widget.Button
 import androidx.activity.enableEdgeToEdge
@@ -25,9 +27,13 @@ class MainActivity : AppCompatActivity() {
     private val userRepository get() = (application as MyApplication).userRepository
     private val playerPreferences by lazy { getSharedPreferences("player", MODE_PRIVATE) }
 
-    var currentUser: User? = null
+    private val selectedUserState = MutableStateFlow<User?>(null)
+    val selectedUser = selectedUserState.asStateFlow()
+
+    var currentUser: User?
+        get() = selectedUserState.value
         set(value) {
-            field = value
+            selectedUserState.value = value
             playerPreferences.edit().putLong("userId", value?.id ?: 0).apply()
         }
 
@@ -62,6 +68,7 @@ class MainActivity : AppCompatActivity() {
                 2 -> getString(R.string.tab_authors)
                 3 -> getString(R.string.tab_settings)
                 4 -> getString(R.string.tab_records)
+                5 -> getString(R.string.tab_campaign)
                 else -> ""
             }
         }

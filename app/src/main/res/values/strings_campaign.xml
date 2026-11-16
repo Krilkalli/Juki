@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tab_campaign">Кампания</string>
+    <string name="campaign_free_play">Обычная игра</string>
+    <string name="campaign_title">Кампания: 3 уровня</string>
+    <string name="campaign_description">Наберите нужное количество очков к концу минуты. Каждый пройденный уровень открывает следующий. Пройденные уровни можно играть снова.</string>
+    <string name="campaign_player">Игрок: %1$s</string>
+    <string name="campaign_select_player">Сначала выберите игрока во вкладке регистрации.</string>
+    <string name="campaign_loading">Загрузка прогресса…</string>
+    <string name="campaign_error">Не удалось загрузить прогресс.</string>
+    <string name="campaign_retry">Повторить загрузку</string>
+    <string name="campaign_complete">Кампания пройдена! Все уровни доступны для повторной игры.</string>
+    <string name="campaign_count">Пройдено уровней: %1$d из %2$d</string>
+    <string name="campaign_level_details">Уровень %1$d — %2$s\nЦель: %3$d очков за %4$d сек.\nСкорость: %5$d из 100; жуков на поле: до %6$d.</string>
+    <string name="campaign_best">Лучший результат: %1$d очков.</string>
+    <string name="campaign_no_attempts">Попыток пока нет.</string>
+    <string name="campaign_start_level">Начать уровень %1$d</string>
+    <string name="campaign_replay_level">Уровень %1$d пройден — играть снова</string>
+    <string name="campaign_locked_level">Закрыт — пройдите уровень %1$d</string>
+    <string name="campaign_goal">Уровень %1$d: цель %2$d очков</string>
+    <string name="campaign_passed">Уровень пройден!</string>
+    <string name="campaign_failed">Уровень не пройден. Нужно набрать %1$d очков к концу раунда.</string>
+    <string name="campaign_unlocked_next">После сохранения результата будет доступен уровень %1$d.</string>
+    <string name="campaign_final_passed">Это последний уровень. После сохранения кампания будет пройдена!</string>
+    <string name="campaign_to_levels">К уровням</string>
+    <string name="campaign_locked">Этот уровень закрыт. Сначала пройдите предыдущие уровни.</string>
+</resources>
